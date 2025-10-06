@@ -1,0 +1,238 @@
+name: CI
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+  merge_group:
+    branches: [ "master" ]
+
+permissions:
+  contents: read
+
+env:
+  PROTOC_VERSION: '3.25.3'
+  clippy_rust_version: '1.87'
+
+jobs:
+  # Depends on all actions that are required for a "successful" CI run.
+  tests-pass:
+    name: all systems go
+    runs-on: ubuntu-latest
+    needs:
+      - rustfmt
+      - toml_validation
+      - clippy
+      - docs
+      - machete
+      - unused_dependencies
+      - test
+      - msrv
+      - minimal-versions
+      - kani
+      - no-std
+      - check-readme
+    steps:
+      - run: exit 0
+
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  toml_validation:
+    runs-on: ubuntu-latest
+    container:
+      image: tamasfe/taplo:0.8.1
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v5
+      - name: taplo lint
+        run: taplo lint
+      - name: taplo fmt
+        run: taplo fmt --check --diff
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - name: install ninja
+        uses: ./.github/actions/setup-ninja
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.clippy_rust_version }}
+          components: clippy
+      - run: cargo clippy --workspace --exclude protobuf --all-features --tests -- -D warnings
+      - name: enable edition 2024 lints in `prost-derive` macros
+        run: sed -i 's/edition = "[0-9]*"/edition = "2024"/' Cargo.toml 
+      - name: set MSRV to clippy version to enable more lints
+        run: sed -i 's/rust-version = "[.0-9]*"/rust-version = "${{ env.clippy_rust_version }}"/' Cargo.toml
+      - name: clippy with edition 2024
+        run: cargo clippy --workspace --exclude protobuf --all-features --tests -- -D warnings
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - name: install ninja
+        uses: ./.github/actions/setup-ninja
+      - uses: dtolnay/rust-toolchain@stable
+      - name: "doc --lib --all-features"
+        run: |
+          cargo doc --lib --no-deps --all-features --document-private-items
+        env:
+          RUSTDOCFLAGS: -Dwarnings
+
+  machete:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-machete
+      - name: Check unused dependencies
+        run: cargo machete
+
+  unused_dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - name: install ninja
+        uses: ./.github/actions/setup-ninja
+      - name: install cargo-udeps
+        uses: taiki-e/install-action@cargo-udeps
+      - name: cargo udeps
+        run: cargo +nightly udeps
+      - name: cargo udeps all-targets
+        run: cargo +nightly udeps --all-targets
+
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+        os:
+          - ubuntu-latest
+          - macos-14
+          - windows-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: 'recursive'
+      - name: install toolchain (${{ matrix.toolchain }})
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.toolchain }}
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - name: install ninja
+        uses: ./.github/actions/setup-ninja
+      - uses: Swatinem/rust-cache@v2
+      - name: test
+        run: cargo test --features arbitrary
+      - name: test no-default-features
+        run: cargo test -p prost-build -p prost-derive -p prost-types --no-default-features
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: Swatinem/rust-cache@v2
+      - name: check with no-default-features
+        run: cargo hack --rust-version --no-private --no-dev-deps check --no-default-features
+      - name: check with all-features
+        run: cargo hack --rust-version --no-private --no-dev-deps check --all-features
+
+  minimal-versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@cargo-hack
+      - uses: taiki-e/install-action@cargo-minimal-versions
+      - run: cargo minimal-versions --no-private check --all-features
+
+  kani:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify with Kani
+        uses: model-checking/kani-github-action@v1.1
+        with:
+          args: |
+            -p prost-types --features chrono
+  no-std:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@nightly
+      - name: install protoc
+        uses: taiki-e/install-action@v2
+        with:
+          tool: protoc@${{ env.PROTOC_VERSION }}
+      - uses: Swatinem/rust-cache@v2
+      - name: install cargo-no-std-check
+        uses: baptiste0928/cargo-install@v3
+        with:
+          crate: cargo-no-std-check
+      - name: prost cargo-no-std-check
+        run: cargo no-std-check --manifest-path prost/Cargo.toml --no-default-features
+      - name: prost-types cargo-no-std-check
+        run: cargo no-std-check --manifest-path prost-types/Cargo.toml --no-default-features
+      # prost-build depends on prost with --no-default-features, but when
+      # prost-build is built through the workspace, prost typically has default
+      # features enabled due to vagaries in Cargo workspace feature resolution.
+      # This additional check ensures that prost-build does not rely on any of
+      # prost's default features to compile.
+      - name: prost-build check
+        run: cargo check --manifest-path prost-build/Cargo.toml
+      - name: tests-no-std cargo-no-std-check
+        run: cargo no-std-check --manifest-path tests-no-std/Cargo.toml
+
+  semver-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+
+  check-readme:
+    name: Check README
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify that Prost version is up to date in README
+        run: grep -q "$(sed '/^version = /!d' Cargo.toml | head -n1)" README.md
+      - name: Verify that MSRV version is up to date in README
+        run: grep -q "supports $(sed -n 's/rust-version = "\(.*\)"/\1/p' Cargo.toml)\." README.md

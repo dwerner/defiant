@@ -1,0 +1,10 @@
+syntax = "proto3";
+package option_enum;
+
+enum Option {
+  HELLO = 0;
+}
+
+message FailMessage {
+  Option result = 1;
+}
