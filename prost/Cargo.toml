@@ -24,12 +24,18 @@ std = []
 [dependencies]
 bytes = { version = "1", default-features = false }
 prost-derive = { version = "0.14.1", path = "../prost-derive", optional = true }
+bumpalo = { version = "3.16", features = ["collections"] }
 
 [dev-dependencies]
 criterion = { version = "0.7", default-features = false }
 proptest = "1"
 rand = "0.9"
+dhat = "0.3"
 
 [[bench]]
 name = "varint"
+harness = false
+
+[[bench]]
+name = "arena_benchmark"
 harness = false

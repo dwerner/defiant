@@ -11,6 +11,7 @@ use alloc::vec::Vec;
 
 use ::bytes::{Buf, BufMut, Bytes};
 
+use crate::arena::Arena;
 use crate::encoding::wire_type::WireType;
 use crate::{
     encoding::{
@@ -20,7 +21,10 @@ use crate::{
 };
 
 /// `google.protobuf.BoolValue`
-impl Message for bool {
+impl Message<'_> for bool {
+    fn new_in(_arena: &Arena) -> Self {
+        false
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self {
             bool::encode(1, self, buf)
@@ -31,6 +35,7 @@ impl Message for bool {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -62,7 +67,10 @@ impl Name for bool {
 }
 
 /// `google.protobuf.UInt32Value`
-impl Message for u32 {
+impl Message<'_> for u32 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             uint32::encode(1, self, buf)
@@ -73,6 +81,7 @@ impl Message for u32 {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -104,7 +113,10 @@ impl Name for u32 {
 }
 
 /// `google.protobuf.UInt64Value`
-impl Message for u64 {
+impl Message<'_> for u64 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             uint64::encode(1, self, buf)
@@ -115,6 +127,7 @@ impl Message for u64 {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -146,7 +159,10 @@ impl Name for u64 {
 }
 
 /// `google.protobuf.Int32Value`
-impl Message for i32 {
+impl Message<'_> for i32 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             int32::encode(1, self, buf)
@@ -157,6 +173,7 @@ impl Message for i32 {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -188,7 +205,10 @@ impl Name for i32 {
 }
 
 /// `google.protobuf.Int64Value`
-impl Message for i64 {
+impl Message<'_> for i64 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             int64::encode(1, self, buf)
@@ -199,6 +219,7 @@ impl Message for i64 {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -230,7 +251,10 @@ impl Name for i64 {
 }
 
 /// `google.protobuf.FloatValue`
-impl Message for f32 {
+impl Message<'_> for f32 {
+    fn new_in(_arena: &Arena) -> Self {
+        0.0
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0.0 {
             float::encode(1, self, buf)
@@ -241,6 +265,7 @@ impl Message for f32 {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -272,7 +297,10 @@ impl Name for f32 {
 }
 
 /// `google.protobuf.DoubleValue`
-impl Message for f64 {
+impl Message<'_> for f64 {
+    fn new_in(_arena: &Arena) -> Self {
+        0.0
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0.0 {
             double::encode(1, self, buf)
@@ -283,6 +311,7 @@ impl Message for f64 {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -314,7 +343,10 @@ impl Name for f64 {
 }
 
 /// `google.protobuf.StringValue`
-impl Message for String {
+impl Message<'_> for String {
+    fn new_in(_arena: &Arena) -> Self {
+        String::new()
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if !self.is_empty() {
             string::encode(1, self, buf)
@@ -325,6 +357,7 @@ impl Message for String {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -356,7 +389,10 @@ impl Name for String {
 }
 
 /// `google.protobuf.BytesValue`
-impl Message for Vec<u8> {
+impl Message<'_> for Vec<u8> {
+    fn new_in(_arena: &Arena) -> Self {
+        Vec::new()
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if !self.is_empty() {
             bytes::encode(1, self, buf)
@@ -367,6 +403,7 @@ impl Message for Vec<u8> {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -398,7 +435,10 @@ impl Name for Vec<u8> {
 }
 
 /// `google.protobuf.BytesValue`
-impl Message for Bytes {
+impl Message<'_> for Bytes {
+    fn new_in(_arena: &Arena) -> Self {
+        Bytes::new()
+    }
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if !self.is_empty() {
             bytes::encode(1, self, buf)
@@ -409,6 +449,7 @@ impl Message for Bytes {
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         if tag == 1 {
@@ -440,13 +481,17 @@ impl Name for Bytes {
 }
 
 /// `google.protobuf.Empty`
-impl Message for () {
+impl Message<'_> for () {
+    fn new_in(_arena: &Arena) -> Self {
+        ()
+    }
     fn encode_raw(&self, _buf: &mut impl BufMut) {}
     fn merge_field(
         &mut self,
         tag: u32,
         wire_type: WireType,
         buf: &mut impl Buf,
+        _arena: &Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         skip_field(wire_type, tag, buf, ctx)

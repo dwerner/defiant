@@ -2,7 +2,7 @@ mod group;
 mod map;
 mod message;
 mod oneof;
-mod scalar;
+pub(crate) mod scalar;
 
 use std::fmt;
 use std::slice;
@@ -13,6 +13,9 @@ use quote::quote;
 use syn::punctuated::Punctuated;
 use syn::Path;
 use syn::{Attribute, Expr, ExprLit, Lit, LitBool, LitInt, Meta, MetaNameValue, Token};
+
+// Re-export Ty for use in lib.rs
+pub(crate) use scalar::Ty;
 
 #[derive(Clone)]
 pub enum Field {
@@ -36,7 +39,10 @@ impl Field {
     pub fn new(attrs: Vec<Attribute>, inferred_tag: Option<u32>) -> Result<Option<Field>, Error> {
         let attrs = prost_attrs(attrs)?;
 
-        // TODO: check for ignore attribute.
+        // Check for skip attribute.
+        if attrs.iter().any(|attr| word_attr("skip", attr)) {
+            return Ok(None);
+        }
 
         let field = if let Some(field) = scalar::Field::new(&attrs, inferred_tag)? {
             Field::Scalar(field)
@@ -62,7 +68,10 @@ impl Field {
     pub fn new_oneof(attrs: Vec<Attribute>) -> Result<Option<Field>, Error> {
         let attrs = prost_attrs(attrs)?;
 
-        // TODO: check for ignore attribute.
+        // Check for skip attribute.
+        if attrs.iter().any(|attr| word_attr("skip", attr)) {
+            return Ok(None);
+        }
 
         let field = if let Some(field) = scalar::Field::new_oneof(&attrs)? {
             Field::Scalar(field)
@@ -145,12 +154,17 @@ impl Field {
     pub fn debug(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         match *self {
             Field::Scalar(ref scalar) => {
-                let wrapper = scalar.debug(prost_path, quote!(ScalarWrapper));
-                quote! {
-                    {
-                        #wrapper
-                        ScalarWrapper(&#ident)
+                // For non-enum scalars, no wrapper needed - just use the value directly
+                if let scalar::Ty::Enumeration(_) = scalar.ty {
+                    let wrapper = scalar.debug(prost_path, quote!(ScalarWrapper));
+                    quote! {
+                        {
+                            #wrapper
+                            ScalarWrapper(&#ident)
+                        }
                     }
+                } else {
+                    quote!(&#ident)
                 }
             }
             Field::Map(ref map) => {
@@ -171,6 +185,16 @@ impl Field {
             Field::Scalar(ref scalar) => scalar.methods(ident),
             Field::Map(ref map) => map.methods(prost_path, ident),
             _ => None,
+        }
+    }
+
+    /// Returns true if this field is a repeated field.
+    pub fn is_repeated(&self) -> bool {
+        match *self {
+            Field::Scalar(ref scalar) => scalar.is_repeated(),
+            Field::Map(_) => true,  // Maps are encoded as repeated
+            Field::Message(ref message) => message.label == Label::Repeated,
+            _ => false,
         }
     }
 }

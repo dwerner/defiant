@@ -3,14 +3,14 @@
 /// files it parses.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileDescriptorSet {
+pub struct FileDescriptorSet<'arena> {
     #[prost(message, repeated, tag = "1")]
-    pub file: ::prost::alloc::vec::Vec<FileDescriptorProto>,
+    pub file: &'arena [FileDescriptorProto<'arena>],
 }
 /// Describes a complete .proto file.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileDescriptorProto {
+pub struct FileDescriptorProto<'arena> {
     /// file name, relative to root of source tree
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
@@ -29,21 +29,21 @@ pub struct FileDescriptorProto {
     pub weak_dependency: ::prost::alloc::vec::Vec<i32>,
     /// All top-level definitions in this file.
     #[prost(message, repeated, tag = "4")]
-    pub message_type: ::prost::alloc::vec::Vec<DescriptorProto>,
+    pub message_type: &'arena [DescriptorProto<'arena>],
     #[prost(message, repeated, tag = "5")]
-    pub enum_type: ::prost::alloc::vec::Vec<EnumDescriptorProto>,
+    pub enum_type: &'arena [EnumDescriptorProto<'arena>],
     #[prost(message, repeated, tag = "6")]
-    pub service: ::prost::alloc::vec::Vec<ServiceDescriptorProto>,
+    pub service: &'arena [ServiceDescriptorProto<'arena>],
     #[prost(message, repeated, tag = "7")]
-    pub extension: ::prost::alloc::vec::Vec<FieldDescriptorProto>,
+    pub extension: &'arena [FieldDescriptorProto<'arena>],
     #[prost(message, optional, tag = "8")]
-    pub options: ::core::option::Option<FileOptions>,
+    pub options: ::core::option::Option<&'arena FileOptions<'arena>>,
     /// This field contains optional information about the original source code.
     /// You may safely remove this entire field without harming runtime
     /// functionality of the descriptors -- the information is needed only by
     /// development tools.
     #[prost(message, optional, tag = "9")]
-    pub source_code_info: ::core::option::Option<SourceCodeInfo>,
+    pub source_code_info: ::core::option::Option<&'arena SourceCodeInfo<'arena>>,
     /// The syntax of the proto file.
     /// The supported values are "proto2" and "proto3".
     #[prost(string, optional, tag = "12")]
@@ -52,25 +52,25 @@ pub struct FileDescriptorProto {
 /// Describes a message type.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct DescriptorProto {
+pub struct DescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "2")]
-    pub field: ::prost::alloc::vec::Vec<FieldDescriptorProto>,
+    pub field: &'arena [FieldDescriptorProto<'arena>],
     #[prost(message, repeated, tag = "6")]
-    pub extension: ::prost::alloc::vec::Vec<FieldDescriptorProto>,
+    pub extension: &'arena [FieldDescriptorProto<'arena>],
     #[prost(message, repeated, tag = "3")]
-    pub nested_type: ::prost::alloc::vec::Vec<DescriptorProto>,
+    pub nested_type: &'arena [DescriptorProto<'arena>],
     #[prost(message, repeated, tag = "4")]
-    pub enum_type: ::prost::alloc::vec::Vec<EnumDescriptorProto>,
+    pub enum_type: &'arena [EnumDescriptorProto<'arena>],
     #[prost(message, repeated, tag = "5")]
-    pub extension_range: ::prost::alloc::vec::Vec<descriptor_proto::ExtensionRange>,
+    pub extension_range: &'arena [descriptor_proto::ExtensionRange<'arena>],
     #[prost(message, repeated, tag = "8")]
-    pub oneof_decl: ::prost::alloc::vec::Vec<OneofDescriptorProto>,
+    pub oneof_decl: &'arena [OneofDescriptorProto<'arena>],
     #[prost(message, optional, tag = "7")]
-    pub options: ::core::option::Option<MessageOptions>,
+    pub options: ::core::option::Option<&'arena MessageOptions<'arena>>,
     #[prost(message, repeated, tag = "9")]
-    pub reserved_range: ::prost::alloc::vec::Vec<descriptor_proto::ReservedRange>,
+    pub reserved_range: &'arena [descriptor_proto::ReservedRange<'arena>],
     /// Reserved field names, which may not be used by fields in the same message.
     /// A given name may only be reserved once.
     #[prost(string, repeated, tag = "10")]
@@ -80,7 +80,7 @@ pub struct DescriptorProto {
 pub mod descriptor_proto {
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, PartialEq, ::prost::Message)]
-    pub struct ExtensionRange {
+    pub struct ExtensionRange<'arena> {
         /// Inclusive.
         #[prost(int32, optional, tag = "1")]
         pub start: ::core::option::Option<i32>,
@@ -88,33 +88,35 @@ pub mod descriptor_proto {
         #[prost(int32, optional, tag = "2")]
         pub end: ::core::option::Option<i32>,
         #[prost(message, optional, tag = "3")]
-        pub options: ::core::option::Option<super::ExtensionRangeOptions>,
+        pub options: ::core::option::Option<&'arena super::ExtensionRangeOptions<'arena>>,
     }
     /// Range of reserved tag numbers. Reserved tag numbers may not be used by
     /// fields or extension ranges in the same message. Reserved ranges may
     /// not overlap.
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-    pub struct ReservedRange {
+    pub struct ReservedRange<'arena> {
         /// Inclusive.
         #[prost(int32, optional, tag = "1")]
         pub start: ::core::option::Option<i32>,
         /// Exclusive.
         #[prost(int32, optional, tag = "2")]
         pub end: ::core::option::Option<i32>,
+        #[prost(skip)]
+        pub _phantom: ::core::marker::PhantomData<&'arena ()>,
     }
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ExtensionRangeOptions {
+pub struct ExtensionRangeOptions<'arena> {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 /// Describes a field within a message.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FieldDescriptorProto {
+pub struct FieldDescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, optional, tag = "3")]
@@ -154,7 +156,7 @@ pub struct FieldDescriptorProto {
     #[prost(string, optional, tag = "10")]
     pub json_name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "8")]
-    pub options: ::core::option::Option<FieldOptions>,
+    pub options: ::core::option::Option<&'arena FieldOptions<'arena>>,
     /// If true, this is a proto3 "optional". When a proto3 field is optional, it
     /// tracks presence regardless of field type.
     ///
@@ -325,29 +327,27 @@ pub mod field_descriptor_proto {
 /// Describes a oneof.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct OneofDescriptorProto {
+pub struct OneofDescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "2")]
-    pub options: ::core::option::Option<OneofOptions>,
+    pub options: ::core::option::Option<&'arena OneofOptions<'arena>>,
 }
 /// Describes an enum type.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EnumDescriptorProto {
+pub struct EnumDescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "2")]
-    pub value: ::prost::alloc::vec::Vec<EnumValueDescriptorProto>,
+    pub value: &'arena [EnumValueDescriptorProto<'arena>],
     #[prost(message, optional, tag = "3")]
-    pub options: ::core::option::Option<EnumOptions>,
+    pub options: ::core::option::Option<&'arena EnumOptions<'arena>>,
     /// Range of reserved numeric values. Reserved numeric values may not be used
     /// by enum values in the same enum declaration. Reserved ranges may not
     /// overlap.
     #[prost(message, repeated, tag = "4")]
-    pub reserved_range: ::prost::alloc::vec::Vec<
-        enum_descriptor_proto::EnumReservedRange,
-    >,
+    pub reserved_range: &'arena [enum_descriptor_proto::EnumReservedRange<'arena>],
     /// Reserved enum value names, which may not be reused. A given name may only
     /// be reserved once.
     #[prost(string, repeated, tag = "5")]
@@ -363,41 +363,43 @@ pub mod enum_descriptor_proto {
     /// domain.
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-    pub struct EnumReservedRange {
+    pub struct EnumReservedRange<'arena> {
         /// Inclusive.
         #[prost(int32, optional, tag = "1")]
         pub start: ::core::option::Option<i32>,
         /// Inclusive.
         #[prost(int32, optional, tag = "2")]
         pub end: ::core::option::Option<i32>,
+        #[prost(skip)]
+        pub _phantom: ::core::marker::PhantomData<&'arena ()>,
     }
 }
 /// Describes a value within an enum.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EnumValueDescriptorProto {
+pub struct EnumValueDescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(int32, optional, tag = "2")]
     pub number: ::core::option::Option<i32>,
     #[prost(message, optional, tag = "3")]
-    pub options: ::core::option::Option<EnumValueOptions>,
+    pub options: ::core::option::Option<&'arena EnumValueOptions<'arena>>,
 }
 /// Describes a service.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ServiceDescriptorProto {
+pub struct ServiceDescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, repeated, tag = "2")]
-    pub method: ::prost::alloc::vec::Vec<MethodDescriptorProto>,
+    pub method: &'arena [MethodDescriptorProto<'arena>],
     #[prost(message, optional, tag = "3")]
-    pub options: ::core::option::Option<ServiceOptions>,
+    pub options: ::core::option::Option<&'arena ServiceOptions<'arena>>,
 }
 /// Describes a method of a service.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MethodDescriptorProto {
+pub struct MethodDescriptorProto<'arena> {
     #[prost(string, optional, tag = "1")]
     pub name: ::core::option::Option<::prost::alloc::string::String>,
     /// Input and output type names.  These are resolved in the same way as
@@ -407,7 +409,7 @@ pub struct MethodDescriptorProto {
     #[prost(string, optional, tag = "3")]
     pub output_type: ::core::option::Option<::prost::alloc::string::String>,
     #[prost(message, optional, tag = "4")]
-    pub options: ::core::option::Option<MethodOptions>,
+    pub options: ::core::option::Option<&'arena MethodOptions<'arena>>,
     /// Identifies if client streams multiple client messages
     #[prost(bool, optional, tag = "5", default = "false")]
     pub client_streaming: ::core::option::Option<bool>,
@@ -446,7 +448,7 @@ pub struct MethodDescriptorProto {
 ///   to automatically assign option numbers.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FileOptions {
+pub struct FileOptions<'arena> {
     /// Sets the Java package where classes generated from this .proto will be
     /// placed.  By default, the proto package is used, but this is often
     /// inappropriate because proto packages do not normally start with backwards
@@ -558,7 +560,7 @@ pub struct FileOptions {
     /// The parser stores options it doesn't recognize here.
     /// See the documentation for the "Options" section above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 /// Nested message and enum types in `FileOptions`.
 pub mod file_options {
@@ -611,7 +613,7 @@ pub mod file_options {
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MessageOptions {
+pub struct MessageOptions<'arena> {
     /// Set true to use the old proto1 MessageSet wire format for extensions.
     /// This is provided for backwards-compatibility with the MessageSet wire
     /// format.  You should not use this for any other reason:  It's less
@@ -668,11 +670,11 @@ pub struct MessageOptions {
     pub map_entry: ::core::option::Option<bool>,
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct FieldOptions {
+pub struct FieldOptions<'arena> {
     /// The ctype option instructs the C++ code generator to use a different
     /// representation of the field than it normally would.  See the specific
     /// options below.  This option is not yet implemented in the open source
@@ -749,7 +751,7 @@ pub struct FieldOptions {
     pub weak: ::core::option::Option<bool>,
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 /// Nested message and enum types in `FieldOptions`.
 pub mod field_options {
@@ -840,14 +842,14 @@ pub mod field_options {
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct OneofOptions {
+pub struct OneofOptions<'arena> {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EnumOptions {
+pub struct EnumOptions<'arena> {
     /// Set this option to true to allow mapping different tag names to the same
     /// value.
     #[prost(bool, optional, tag = "2")]
@@ -860,11 +862,11 @@ pub struct EnumOptions {
     pub deprecated: ::core::option::Option<bool>,
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EnumValueOptions {
+pub struct EnumValueOptions<'arena> {
     /// Is this enum value deprecated?
     /// Depending on the target platform, this can emit Deprecated annotations
     /// for the enum value, or it will be completely ignored; in the very least,
@@ -873,11 +875,11 @@ pub struct EnumValueOptions {
     pub deprecated: ::core::option::Option<bool>,
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ServiceOptions {
+pub struct ServiceOptions<'arena> {
     /// Is this service deprecated?
     /// Depending on the target platform, this can emit Deprecated annotations
     /// for the service, or it will be completely ignored; in the very least,
@@ -886,11 +888,11 @@ pub struct ServiceOptions {
     pub deprecated: ::core::option::Option<bool>,
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct MethodOptions {
+pub struct MethodOptions<'arena> {
     /// Is this method deprecated?
     /// Depending on the target platform, this can emit Deprecated annotations
     /// for the method, or it will be completely ignored; in the very least,
@@ -906,7 +908,7 @@ pub struct MethodOptions {
     pub idempotency_level: ::core::option::Option<i32>,
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
-    pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    pub uninterpreted_option: &'arena [UninterpretedOption<'arena>],
 }
 /// Nested message and enum types in `MethodOptions`.
 pub mod method_options {
@@ -964,9 +966,9 @@ pub mod method_options {
 /// in them.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct UninterpretedOption {
+pub struct UninterpretedOption<'arena> {
     #[prost(message, repeated, tag = "2")]
-    pub name: ::prost::alloc::vec::Vec<uninterpreted_option::NamePart>,
+    pub name: &'arena [uninterpreted_option::NamePart<'arena>],
     /// The value of the uninterpreted option, in whatever type the tokenizer
     /// identified it as during parsing. Exactly one of these should be set.
     #[prost(string, optional, tag = "3")]
@@ -991,18 +993,20 @@ pub mod uninterpreted_option {
     /// "foo.(bar.baz).qux".
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-    pub struct NamePart {
+    pub struct NamePart<'arena> {
         #[prost(string, required, tag = "1")]
         pub name_part: ::prost::alloc::string::String,
         #[prost(bool, required, tag = "2")]
         pub is_extension: bool,
+        #[prost(skip)]
+        pub _phantom: ::core::marker::PhantomData<&'arena ()>,
     }
 }
 /// Encapsulates information about the original source file from which a
 /// FileDescriptorProto was generated.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct SourceCodeInfo {
+pub struct SourceCodeInfo<'arena> {
     /// A Location identifies a piece of source code in a .proto file which
     /// corresponds to a particular definition.  This information is intended
     /// to be useful to IDEs, code indexers, documentation generators, and similar
@@ -1048,13 +1052,13 @@ pub struct SourceCodeInfo {
     ///   ignore those that it doesn't understand, as more types of locations could
     ///   be recorded in the future.
     #[prost(message, repeated, tag = "1")]
-    pub location: ::prost::alloc::vec::Vec<source_code_info::Location>,
+    pub location: &'arena [source_code_info::Location<'arena>],
 }
 /// Nested message and enum types in `SourceCodeInfo`.
 pub mod source_code_info {
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-    pub struct Location {
+    pub struct Location<'arena> {
         /// Identifies which part of the FileDescriptorProto was defined at this
         /// location.
         ///
@@ -1142,6 +1146,8 @@ pub mod source_code_info {
         pub leading_detached_comments: ::prost::alloc::vec::Vec<
             ::prost::alloc::string::String,
         >,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
     }
 }
 /// Describes the relationship between generated code and its original source
@@ -1149,17 +1155,17 @@ pub mod source_code_info {
 /// source file, but may contain references to different source .proto files.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct GeneratedCodeInfo {
+pub struct GeneratedCodeInfo<'arena> {
     /// An Annotation connects some span of text in generated code to an element
     /// of its generating .proto file.
     #[prost(message, repeated, tag = "1")]
-    pub annotation: ::prost::alloc::vec::Vec<generated_code_info::Annotation>,
+    pub annotation: &'arena [generated_code_info::Annotation<'arena>],
 }
 /// Nested message and enum types in `GeneratedCodeInfo`.
 pub mod generated_code_info {
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-    pub struct Annotation {
+    pub struct Annotation<'arena> {
         /// Identifies the element in the original source .proto file. This field
         /// is formatted the same as SourceCodeInfo.Location.path.
         #[prost(int32, repeated, tag = "1")]
@@ -1176,6 +1182,8 @@ pub mod generated_code_info {
         /// the last relevant byte (so the length of the text = end - begin).
         #[prost(int32, optional, tag = "4")]
         pub end: ::core::option::Option<i32>,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
     }
 }
 /// `Any` contains an arbitrary serialized protocol buffer message along with a
@@ -1273,7 +1281,7 @@ pub mod generated_code_info {
 /// ```
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct Any {
+pub struct Any<'arena> {
     /// A URL/resource name that uniquely identifies the type of the serialized
     /// protocol buffer message. This string must contain at least
     /// one "/" character. The last segment of the URL's path must represent
@@ -1306,36 +1314,40 @@ pub struct Any {
     /// Must be a valid serialized protocol buffer of the above specified type.
     #[prost(bytes = "vec", tag = "2")]
     pub value: ::prost::alloc::vec::Vec<u8>,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// `SourceContext` represents information about the source of a
 /// protobuf element, like the file in which it is defined.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct SourceContext {
+pub struct SourceContext<'arena> {
     /// The path-qualified name of the .proto file that contained the associated
     /// protobuf element.  For example: `"google/protobuf/source_context.proto"`.
     #[prost(string, tag = "1")]
     pub file_name: ::prost::alloc::string::String,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// A protocol buffer message type.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Type {
+pub struct Type<'arena> {
     /// The fully qualified message name.
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
     /// The list of fields.
     #[prost(message, repeated, tag = "2")]
-    pub fields: ::prost::alloc::vec::Vec<Field>,
+    pub fields: &'arena [Field<'arena>],
     /// The list of types appearing in `oneof` definitions in this type.
     #[prost(string, repeated, tag = "3")]
     pub oneofs: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     /// The protocol buffer options.
     #[prost(message, repeated, tag = "4")]
-    pub options: ::prost::alloc::vec::Vec<Option>,
+    pub options: &'arena [Option<'arena>],
     /// The source context.
     #[prost(message, optional, tag = "5")]
-    pub source_context: ::core::option::Option<SourceContext>,
+    pub source_context: ::core::option::Option<&'arena SourceContext<'arena>>,
     /// The source syntax.
     #[prost(enumeration = "Syntax", tag = "6")]
     pub syntax: i32,
@@ -1343,7 +1355,7 @@ pub struct Type {
 /// A single field of a message type.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Field {
+pub struct Field<'arena> {
     /// The field type.
     #[prost(enumeration = "field::Kind", tag = "1")]
     pub kind: i32,
@@ -1369,7 +1381,7 @@ pub struct Field {
     pub packed: bool,
     /// The protocol buffer options.
     #[prost(message, repeated, tag = "9")]
-    pub options: ::prost::alloc::vec::Vec<Option>,
+    pub options: &'arena [Option<'arena>],
     /// The field JSON name.
     #[prost(string, tag = "10")]
     pub json_name: ::prost::alloc::string::String,
@@ -1539,19 +1551,19 @@ pub mod field {
 /// Enum type definition.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Enum {
+pub struct Enum<'arena> {
     /// Enum type name.
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
     /// Enum value definitions.
     #[prost(message, repeated, tag = "2")]
-    pub enumvalue: ::prost::alloc::vec::Vec<EnumValue>,
+    pub enumvalue: &'arena [EnumValue<'arena>],
     /// Protocol buffer options.
     #[prost(message, repeated, tag = "3")]
-    pub options: ::prost::alloc::vec::Vec<Option>,
+    pub options: &'arena [Option<'arena>],
     /// The source context.
     #[prost(message, optional, tag = "4")]
-    pub source_context: ::core::option::Option<SourceContext>,
+    pub source_context: ::core::option::Option<&'arena SourceContext<'arena>>,
     /// The source syntax.
     #[prost(enumeration = "Syntax", tag = "5")]
     pub syntax: i32,
@@ -1559,7 +1571,7 @@ pub struct Enum {
 /// Enum value definition.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct EnumValue {
+pub struct EnumValue<'arena> {
     /// Enum value name.
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -1568,26 +1580,37 @@ pub struct EnumValue {
     pub number: i32,
     /// Protocol buffer options.
     #[prost(message, repeated, tag = "3")]
-    pub options: ::prost::alloc::vec::Vec<Option>,
+    pub options: &'arena [Option<'arena>],
 }
 /// A protocol buffer option, which can be attached to a message, field,
 /// enumeration, etc.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct Option {
+pub struct Option<'arena> {
     /// The option's name. For protobuf built-in options (options defined in
     /// descriptor.proto), this is the short name. For example, `"map_entry"`.
     /// For custom options, it should be the fully-qualified name. For example,
     /// `"google.api.http"`.
     #[prost(string, tag = "1")]
-    pub name: ::prost::alloc::string::String,
+    pub name: &'arena str,
     /// The option's value packed in an Any message. If the value is a primitive,
     /// the corresponding wrapper type defined in google/protobuf/wrappers.proto
     /// should be used. If the value is an enum, it should be stored as an int32
     /// value using the google.protobuf.Int32Value type.
     #[prost(message, optional, tag = "2")]
-    pub value: ::core::option::Option<Any>,
+    pub value: ::core::option::Option<Any<'arena>>,
 }
+
+impl<'arena> Option<'arena> {
+    /// Temporary map method to satisfy derive macro during bootstrap
+    pub fn map<U, F>(self, f: F) -> ::core::option::Option<U>
+    where
+        F: FnOnce(Self) -> U,
+    {
+        Some(f(self))
+    }
+}
+
 /// The syntax in which a protocol buffer element is defined.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
@@ -1629,17 +1652,17 @@ impl Syntax {
 /// detailed terminology.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Api {
+pub struct Api<'arena> {
     /// The fully qualified name of this interface, including package name
     /// followed by the interface's simple name.
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
     /// The methods of this interface, in unspecified order.
     #[prost(message, repeated, tag = "2")]
-    pub methods: ::prost::alloc::vec::Vec<Method>,
+    pub methods: &'arena [Method<'arena>],
     /// Any metadata attached to the interface.
     #[prost(message, repeated, tag = "3")]
-    pub options: ::prost::alloc::vec::Vec<Option>,
+    pub options: &'arena [Option<'arena>],
     /// A version string for this interface. If specified, must have the form
     /// `major-version.minor-version`, as in `1.10`. If the minor version is
     /// omitted, it defaults to zero. If the entire version field is empty, the
@@ -1664,10 +1687,10 @@ pub struct Api {
     /// Source context for the protocol buffer service represented by this
     /// message.
     #[prost(message, optional, tag = "5")]
-    pub source_context: ::core::option::Option<SourceContext>,
+    pub source_context: ::core::option::Option<&'arena SourceContext<'arena>>,
     /// Included interfaces. See \[Mixin\]\[\].
     #[prost(message, repeated, tag = "6")]
-    pub mixins: ::prost::alloc::vec::Vec<Mixin>,
+    pub mixins: &'arena [Mixin<'arena>],
     /// The source syntax of the service.
     #[prost(enumeration = "Syntax", tag = "7")]
     pub syntax: i32,
@@ -1675,7 +1698,7 @@ pub struct Api {
 /// Method represents a method of an API interface.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Method {
+pub struct Method<'arena> {
     /// The simple name of this method.
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -1693,7 +1716,7 @@ pub struct Method {
     pub response_streaming: bool,
     /// Any metadata attached to the method.
     #[prost(message, repeated, tag = "6")]
-    pub options: ::prost::alloc::vec::Vec<Option>,
+    pub options: &'arena [Option<'arena>],
     /// The source syntax of this method.
     #[prost(enumeration = "Syntax", tag = "7")]
     pub syntax: i32,
@@ -1788,7 +1811,7 @@ pub struct Method {
 /// ```
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct Mixin {
+pub struct Mixin<'arena> {
     /// The fully qualified name of the interface which is included.
     #[prost(string, tag = "1")]
     pub name: ::prost::alloc::string::String,
@@ -1796,6 +1819,8 @@ pub struct Mixin {
     /// are rooted.
     #[prost(string, tag = "2")]
     pub root: ::prost::alloc::string::String,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// A Duration represents a signed, fixed-length span of time represented
 /// as a count of seconds and fractions of seconds at nanosecond
@@ -1863,7 +1888,7 @@ pub struct Mixin {
 /// microsecond should be expressed in JSON format as "3.000001s".
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct Duration {
+pub struct Duration<'arena> {
     /// Signed seconds of the span of time. Must be from -315,576,000,000
     /// to +315,576,000,000 inclusive. Note: these bounds are computed from:
     /// 60 sec/min * 60 min/hr * 24 hr/day * 365.25 days/year * 10000 years
@@ -1877,6 +1902,8 @@ pub struct Duration {
     /// to +999,999,999 inclusive.
     #[prost(int32, tag = "2")]
     pub nanos: i32,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// `FieldMask` represents a set of symbolic field paths, for example:
 ///
@@ -2102,10 +2129,12 @@ pub struct Duration {
 /// `INVALID_ARGUMENT` error if any path is unmappable.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct FieldMask {
+pub struct FieldMask<'arena> {
     /// The set of field mask paths.
     #[prost(string, repeated, tag = "1")]
     pub paths: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
+    #[prost(skip)]
+    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// `Struct` represents a structured data value, consisting of fields
 /// which map to dynamically typed values. In some languages, `Struct`
@@ -2117,13 +2146,10 @@ pub struct FieldMask {
 /// The JSON representation for `Struct` is JSON object.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Struct {
+pub struct Struct<'arena> {
     /// Unordered map of dynamically typed values.
     #[prost(btree_map = "string, message", tag = "1")]
-    pub fields: ::prost::alloc::collections::BTreeMap<
-        ::prost::alloc::string::String,
-        Value,
-    >,
+    pub fields: &'arena [(&'arena str, Value<'arena>)],
 }
 /// `Value` represents a dynamically typed value which can be either
 /// null, a number, a string, a boolean, a recursive struct value, or a
@@ -2133,17 +2159,17 @@ pub struct Struct {
 /// The JSON representation for `Value` is JSON value.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct Value {
+pub struct Value<'arena> {
     /// The kind of value.
     #[prost(oneof = "value::Kind", tags = "1, 2, 3, 4, 5, 6")]
-    pub kind: ::core::option::Option<value::Kind>,
+    pub kind: ::core::option::Option<value::Kind<'arena>>,
 }
 /// Nested message and enum types in `Value`.
 pub mod value {
     /// The kind of value.
     #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
     #[derive(Clone, PartialEq, ::prost::Oneof)]
-    pub enum Kind {
+    pub enum Kind<'arena> {
         /// Represents a null value.
         #[prost(enumeration = "super::NullValue", tag = "1")]
         NullValue(i32),
@@ -2158,10 +2184,10 @@ pub mod value {
         BoolValue(bool),
         /// Represents a structured value.
         #[prost(message, tag = "5")]
-        StructValue(super::Struct),
+        StructValue(super::Struct<'arena>),
         /// Represents a repeated `Value`.
         #[prost(message, tag = "6")]
-        ListValue(super::ListValue),
+        ListValue(super::ListValue<'arena>),
     }
 }
 /// `ListValue` is a wrapper around a repeated field of values.
@@ -2169,10 +2195,10 @@ pub mod value {
 /// The JSON representation for `ListValue` is JSON array.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 #[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ListValue {
+pub struct ListValue<'arena> {
     /// Repeated field of dynamically typed values.
     #[prost(message, repeated, tag = "1")]
-    pub values: ::prost::alloc::vec::Vec<Value>,
+    pub values: &'arena [Value<'arena>],
 }
 /// `NullValue` is a singleton enumeration to represent the null value for the
 /// `Value` type union.

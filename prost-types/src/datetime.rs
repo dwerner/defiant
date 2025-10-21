@@ -95,7 +95,7 @@ impl fmt::Display for DateTime {
     }
 }
 
-impl From<Timestamp> for DateTime {
+impl<'arena> From<Timestamp<'arena>> for DateTime {
     /// musl's [`__secs_to_tm`][1] converted to Rust via [c2rust][2] and then cleaned up by hand.
     ///
     /// All existing `strftime`-like APIs in Rust are unable to handle the full range of timestamps
@@ -103,7 +103,7 @@ impl From<Timestamp> for DateTime {
     ///
     /// [1]: http://git.musl-libc.org/cgit/musl/tree/src/time/__secs_to_tm.c
     /// [2]: https://c2rust.com/
-    fn from(mut timestamp: Timestamp) -> DateTime {
+    fn from(mut timestamp: Timestamp<'arena>) -> DateTime {
         timestamp.normalize();
 
         let t = timestamp.seconds;
@@ -568,13 +568,13 @@ pub(crate) fn parse_duration(s: &str) -> Option<Duration> {
         (seconds, nanos as i32)
     };
 
-    Some(Duration { seconds, nanos })
+    Some(Duration { seconds, nanos, _phantom: ::core::marker::PhantomData })
 }
 
-impl TryFrom<DateTime> for Timestamp {
+impl<'arena> TryFrom<DateTime> for Timestamp<'arena> {
     type Error = TimestampError;
 
-    fn try_from(date_time: DateTime) -> Result<Timestamp, TimestampError> {
+    fn try_from(date_time: DateTime) -> Result<Timestamp<'arena>, TimestampError> {
         if !date_time.is_valid() {
             return Err(TimestampError::InvalidDateTime);
         }

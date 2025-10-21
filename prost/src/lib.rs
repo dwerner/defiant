@@ -9,6 +9,7 @@ pub extern crate alloc;
 // Re-export the bytes crate for use within derived code.
 pub use bytes;
 
+pub mod arena;
 mod error;
 mod message;
 mod name;
@@ -17,12 +18,19 @@ mod types;
 #[doc(hidden)]
 pub mod encoding;
 
+pub use crate::arena::{Arena, ArenaFrom, ArenaInto, ArenaMap};
 pub use crate::encoding::length_delimiter::{
     decode_length_delimiter, encode_length_delimiter, length_delimiter_len,
 };
 pub use crate::error::{DecodeError, EncodeError, UnknownEnumValue};
 pub use crate::message::Message;
 pub use crate::name::Name;
+
+/// Trait linking a view type to its builder type.
+pub trait MessageView<'arena> {
+    /// The builder type for constructing this view
+    type Builder;
+}
 
 // See `encoding::DecodeContext` for more info.
 // 100 is the default recursion limit in the C++ implementation.

@@ -1,6 +1,6 @@
 use super::*;
 
-impl Timestamp {
+impl Timestamp<'_> {
     /// Normalizes the timestamp to a canonical format.
     ///
     /// Based on [`google::protobuf::util::CreateNormalized`][1].
@@ -49,7 +49,7 @@ impl Timestamp {
     /// Normalization is based on [`google::protobuf::util::CreateNormalized`][1].
     ///
     /// [1]: https://github.com/google/protobuf/blob/v3.3.2/src/google/protobuf/util/time_util.cc#L59-L77
-    pub fn try_normalize(mut self) -> Result<Timestamp, Timestamp> {
+    pub fn try_normalize<'arena>(mut self) -> Result<Timestamp<'arena>, Timestamp<'arena>> where Self: 'arena {
         let before = self;
         self.normalize();
         // If the seconds value has changed, and is either i64::MIN or i64::MAX, then the timestamp
@@ -74,7 +74,7 @@ impl Timestamp {
     }
 
     /// Creates a new `Timestamp` at the start of the provided UTC date.
-    pub fn date(year: i64, month: u8, day: u8) -> Result<Timestamp, TimestampError> {
+    pub fn date(year: i64, month: u8, day: u8) -> Result<Timestamp<'static>, TimestampError> {
         Timestamp::date_time_nanos(year, month, day, 0, 0, 0, 0)
     }
 
@@ -86,7 +86,7 @@ impl Timestamp {
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Timestamp, TimestampError> {
+    ) -> Result<Timestamp<'static>, TimestampError> {
         Timestamp::date_time_nanos(year, month, day, hour, minute, second, 0)
     }
 
@@ -99,7 +99,7 @@ impl Timestamp {
         minute: u8,
         second: u8,
         nanos: u32,
-    ) -> Result<Timestamp, TimestampError> {
+    ) -> Result<Timestamp<'static>, TimestampError> {
         let date_time = datetime::DateTime {
             year,
             month,
@@ -114,7 +114,7 @@ impl Timestamp {
     }
 }
 
-impl Name for Timestamp {
+impl<'arena> Name for Timestamp<'arena> {
     const PACKAGE: &'static str = PACKAGE;
     const NAME: &'static str = "Timestamp";
 
@@ -124,8 +124,8 @@ impl Name for Timestamp {
 }
 
 #[cfg(feature = "std")]
-impl From<std::time::SystemTime> for Timestamp {
-    fn from(system_time: std::time::SystemTime) -> Timestamp {
+impl From<std::time::SystemTime> for Timestamp<'static> {
+    fn from(system_time: std::time::SystemTime) -> Timestamp<'static> {
         let (seconds, nanos) = match system_time.duration_since(std::time::UNIX_EPOCH) {
             Ok(duration) => {
                 let seconds = i64::try_from(duration.as_secs()).unwrap();
@@ -157,7 +157,7 @@ pub enum TimestampError {
     /// `Timestamp`s are likely representable on 64-bit Unix-like platforms, but other platforms,
     /// such as Windows and 32-bit Linux, may not be able to represent the full range of
     /// `Timestamp`s.
-    OutOfSystemRange(Timestamp),
+    OutOfSystemRange(Timestamp<'static>),
 
     /// An error indicating failure to parse a timestamp in RFC-3339 format.
     ParseFailure,
@@ -189,10 +189,10 @@ impl fmt::Display for TimestampError {
 impl std::error::Error for TimestampError {}
 
 #[cfg(feature = "std")]
-impl TryFrom<Timestamp> for std::time::SystemTime {
+impl<'arena> TryFrom<Timestamp<'arena>> for std::time::SystemTime {
     type Error = TimestampError;
 
-    fn try_from(mut timestamp: Timestamp) -> Result<std::time::SystemTime, Self::Error> {
+    fn try_from(mut timestamp: Timestamp<'arena>) -> Result<std::time::SystemTime, Self::Error> {
         let orig_timestamp = timestamp;
         timestamp.normalize();
 
@@ -215,7 +215,7 @@ impl TryFrom<Timestamp> for std::time::SystemTime {
     }
 }
 
-impl FromStr for Timestamp {
+impl<'arena> FromStr for Timestamp<'arena> {
     type Err = TimestampError;
 
     fn from_str(s: &str) -> Result<Timestamp, TimestampError> {
@@ -223,7 +223,7 @@ impl FromStr for Timestamp {
     }
 }
 
-impl fmt::Display for Timestamp {
+impl<'arena> fmt::Display for Timestamp<'arena> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         datetime::DateTime::from(*self).fmt(f)
     }

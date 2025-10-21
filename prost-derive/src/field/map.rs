@@ -192,6 +192,7 @@ impl Field {
                         #default,
                         &mut #ident,
                         buf,
+                        arena,
                         ctx,
                     )
                 }
@@ -199,7 +200,7 @@ impl Field {
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
                 let vm = quote!(#prost_path::encoding::#val_mod::merge);
-                quote!(#prost_path::encoding::#module::merge(#km, #vm, &mut #ident, buf, ctx))
+                quote!(#prost_path::encoding::#module::merge(#km, #vm, &mut #ident, buf, arena, ctx))
             }
             ValueTy::Message => quote! {
                 #prost_path::encoding::#module::merge(
@@ -207,6 +208,7 @@ impl Field {
                     #prost_path::encoding::message::merge,
                     &mut #ident,
                     buf,
+                    arena,
                     ctx,
                 )
             },

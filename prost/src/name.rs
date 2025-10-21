@@ -6,7 +6,7 @@ use crate::Message;
 use alloc::{format, string::String};
 
 /// Associate a type name with a [`Message`] type.
-pub trait Name: Message {
+pub trait Name {
     /// Simple name for this [`Message`].
     /// This name is the same as it appears in the source .proto file, e.g. `FooBar`.
     const NAME: &'static str;

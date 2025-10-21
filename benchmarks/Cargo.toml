@@ -12,6 +12,7 @@ prost-build = { path = "../prost-build" }
 [dev-dependencies]
 prost = { path = "../prost" }
 criterion = { version = "0.7", default-features = false }
+dhat = "0.3"  # Heap allocation profiler
 
 [lib]
 # https://bheisler.github.io/criterion.rs/book/faq.html#cargo-bench-gives-unrecognized-option-errors-for-valid-command-line-options
@@ -19,4 +20,8 @@ bench = false
 
 [[bench]]
 name = "dataset"
+harness = false
+
+[[bench]]
+name = "allocations"
 harness = false

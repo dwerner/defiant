@@ -63,7 +63,7 @@ impl DecodeContext {
     // at the previous level of recursion.
     #[cfg(not(feature = "no-recursion-limit"))]
     #[inline]
-    pub(crate) fn enter_recursion(&self) -> DecodeContext {
+    pub fn enter_recursion(&self) -> DecodeContext {
         DecodeContext {
             recurse_count: self.recurse_count - 1,
         }
@@ -71,7 +71,7 @@ impl DecodeContext {
 
     #[cfg(feature = "no-recursion-limit")]
     #[inline]
-    pub(crate) fn enter_recursion(&self) -> DecodeContext {
+    pub fn enter_recursion(&self) -> DecodeContext {
         DecodeContext {}
     }
 
@@ -82,7 +82,7 @@ impl DecodeContext {
     /// Returns `Err<DecodeError>` if the recursion limit has been reached.
     #[cfg(not(feature = "no-recursion-limit"))]
     #[inline]
-    pub(crate) fn limit_reached(&self) -> Result<(), DecodeError> {
+    pub fn limit_reached(&self) -> Result<(), DecodeError> {
         if self.recurse_count == 0 {
             Err(DecodeError::new("recursion limit reached"))
         } else {
@@ -92,7 +92,7 @@ impl DecodeContext {
 
     #[cfg(feature = "no-recursion-limit")]
     #[inline]
-    pub(crate) fn limit_reached(&self) -> Result<(), DecodeError> {
+    pub fn limit_reached(&self) -> Result<(), DecodeError> {
         Ok(())
     }
 }
@@ -215,18 +215,21 @@ macro_rules! merge_repeated_numeric {
      $wire_type:expr,
      $merge:ident,
      $merge_repeated:ident) => {
-        pub fn $merge_repeated(
+        pub fn $merge_repeated<V>(
             wire_type: WireType,
-            values: &mut Vec<$ty>,
+            values: &mut V,
             buf: &mut impl Buf,
             ctx: DecodeContext,
-        ) -> Result<(), DecodeError> {
+        ) -> Result<(), DecodeError>
+        where
+            V: core::ops::DerefMut<Target = [$ty]> + core::iter::Extend<$ty>,
+        {
             if wire_type == WireType::LengthDelimited {
                 // Packed.
                 merge_loop(values, buf, ctx, |values, buf, ctx| {
                     let mut value = Default::default();
                     $merge($wire_type, &mut value, buf, ctx)?;
-                    values.push(value);
+                    values.extend(core::iter::once(value));
                     Ok(())
                 })
             } else {
@@ -234,7 +237,7 @@ macro_rules! merge_repeated_numeric {
                 check_wire_type($wire_type, wire_type)?;
                 let mut value = Default::default();
                 $merge(wire_type, &mut value, buf, ctx)?;
-                values.push(value);
+                values.extend(core::iter::once(value));
                 Ok(())
             }
         }
@@ -556,11 +559,55 @@ macro_rules! length_delimited {
 
 pub mod string {
     use super::*;
+    use crate::Arena;
 
+    // Encode function that works with both owned String and borrowed &str
     pub fn encode(tag: u32, value: &String, buf: &mut impl BufMut) {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(value.len() as u64, buf);
         buf.put_slice(value.as_bytes());
+    }
+
+    // Arena-friendly encode for &str
+    pub fn encode_ref(tag: u32, value: &str, buf: &mut impl BufMut) {
+        encode_key(tag, WireType::LengthDelimited, buf);
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value.as_bytes());
+    }
+
+    /// Decodes a string and allocates it in the provided arena.
+    ///
+    /// Returns a reference to the decoded string with the arena's lifetime.
+    pub fn merge_arena<'arena>(
+        wire_type: WireType,
+        buf: &mut impl Buf,
+        arena: &'arena Arena,
+        _ctx: DecodeContext,
+    ) -> Result<&'arena str, DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+
+        // Decode the length
+        let len = decode_varint(buf)?;
+        if len > buf.remaining() as u64 {
+            return Err(DecodeError::new("buffer underflow"));
+        }
+        let len = len as usize;
+
+        // Read bytes into a temporary Vec for UTF-8 validation
+        let mut temp = Vec::with_capacity(len);
+        temp.resize(len, 0);
+        buf.copy_to_slice(&mut temp);
+
+        // Validate UTF-8
+        match str::from_utf8(&temp) {
+            Ok(s) => {
+                // Allocate in arena and return
+                Ok(arena.alloc_str(s))
+            }
+            Err(_) => Err(DecodeError::new(
+                "invalid string value: data is not UTF-8 encoded",
+            )),
+        }
     }
 
     pub fn merge(
@@ -606,7 +653,97 @@ pub mod string {
         }
     }
 
-    length_delimited!(String);
+    // Manual expansion of length_delimited!(String) with generic parameter types
+    pub fn encode_repeated(tag: u32, values: &[String], buf: &mut impl BufMut) {
+        for value in values {
+            encode(tag, value, buf);
+        }
+    }
+
+    /// Encode repeated arena-allocated string refs
+    pub fn encode_repeated_ref(tag: u32, values: &[&str], buf: &mut impl BufMut) {
+        for value in values {
+            encode_ref(tag, value, buf);
+        }
+    }
+
+    /// Encode repeated arena strings from BumpVec
+    pub fn encode_repeated_arena<'a>(
+        tag: u32,
+        values: &crate::arena::BumpVec<'a, &'a str>,
+        buf: &mut impl BufMut,
+    ) {
+        for value in values.iter() {
+            encode_ref(tag, value, buf);
+        }
+    }
+
+    pub fn merge_repeated(
+        wire_type: WireType,
+        values: &mut Vec<String>,
+        buf: &mut impl Buf,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+        let mut value = Default::default();
+        merge(wire_type, &mut value, buf, ctx)?;
+        values.push(value);
+        Ok(())
+    }
+
+    /// Merge repeated string into arena BumpVec
+    pub fn merge_repeated_arena<'a>(
+        wire_type: WireType,
+        values: &mut crate::arena::BumpVec<'a, &'a str>,
+        buf: &mut impl Buf,
+        arena: &'a crate::Arena,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+        let value = merge_arena(wire_type, buf, arena, ctx)?;
+        values.push(value);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn encoded_len(tag: u32, value: &String) -> usize {
+        key_len(tag) + encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    #[inline]
+    pub fn encoded_len_ref(tag: u32, value: &str) -> usize {
+        key_len(tag) + encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    #[inline]
+    pub fn encoded_len_repeated(tag: u32, values: &[String]) -> usize {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|value| encoded_len_varint(value.len() as u64) + value.len())
+                .sum::<usize>()
+    }
+
+    #[inline]
+    pub fn encoded_len_repeated_ref(tag: u32, values: &[&str]) -> usize {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|value| encoded_len_varint(value.len() as u64) + value.len())
+                .sum::<usize>()
+    }
+
+    #[inline]
+    pub fn encoded_len_repeated_arena<'a>(
+        tag: u32,
+        values: &crate::arena::BumpVec<'a, &'a str>,
+    ) -> usize {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|value| encoded_len_varint(value.len() as u64) + value.len())
+                .sum::<usize>()
+    }
 
     #[cfg(test)]
     mod test {
@@ -687,11 +824,46 @@ impl sealed::BytesAdapter for Vec<u8> {
 
 pub mod bytes {
     use super::*;
+    use crate::Arena;
 
     pub fn encode(tag: u32, value: &impl BytesAdapter, buf: &mut impl BufMut) {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(value.len() as u64, buf);
         value.append_to(buf);
+    }
+
+    // Arena-friendly encode for &[u8]
+    pub fn encode_ref(tag: u32, value: &[u8], buf: &mut impl BufMut) {
+        encode_key(tag, WireType::LengthDelimited, buf);
+        encode_varint(value.len() as u64, buf);
+        buf.put_slice(value);
+    }
+
+    /// Decodes bytes and allocates them in the provided arena.
+    ///
+    /// Returns a reference to the decoded bytes with the arena's lifetime.
+    pub fn merge_arena<'arena>(
+        wire_type: WireType,
+        buf: &mut impl Buf,
+        arena: &'arena Arena,
+        _ctx: DecodeContext,
+    ) -> Result<&'arena [u8], DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+
+        // Decode the length
+        let len = decode_varint(buf)?;
+        if len > buf.remaining() as u64 {
+            return Err(DecodeError::new("buffer underflow"));
+        }
+        let len = len as usize;
+
+        // Read bytes into a temporary Vec, then allocate in arena
+        let mut temp = Vec::with_capacity(len);
+        temp.resize(len, 0);
+        buf.copy_to_slice(&mut temp);
+
+        // Allocate in arena and return
+        Ok(arena.alloc_bytes(&temp))
     }
 
     pub fn merge(
@@ -736,12 +908,105 @@ pub mod bytes {
         }
         let len = len as usize;
 
-        // If we must copy, make sure to copy only once.
-        value.replace_with(buf.take(len));
+        // Read into a temporary buffer and then replace
+        let mut temp = Vec::with_capacity(len);
+        temp.resize(len, 0);
+        buf.copy_to_slice(&mut temp);
+        value.replace_with(&temp[..]);
         Ok(())
     }
 
-    length_delimited!(impl BytesAdapter);
+    // Manual expansion of length_delimited!(impl BytesAdapter) with _ref variants
+    pub fn encode_repeated(tag: u32, values: &[impl BytesAdapter], buf: &mut impl BufMut) {
+        for value in values {
+            encode(tag, value, buf);
+        }
+    }
+
+    pub fn merge_repeated(
+        wire_type: WireType,
+        values: &mut Vec<impl BytesAdapter>,
+        buf: &mut impl Buf,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+        let mut value = Default::default();
+        merge(wire_type, &mut value, buf, ctx)?;
+        values.push(value);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn encoded_len(tag: u32, value: &impl BytesAdapter) -> usize {
+        key_len(tag) + encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    #[inline]
+    pub fn encoded_len_ref(tag: u32, value: &[u8]) -> usize {
+        key_len(tag) + encoded_len_varint(value.len() as u64) + value.len()
+    }
+
+    #[inline]
+    pub fn encoded_len_repeated(tag: u32, values: &[impl BytesAdapter]) -> usize {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|value| encoded_len_varint(value.len() as u64) + value.len())
+                .sum::<usize>()
+    }
+
+    /// Encode repeated arena-allocated byte slices
+    pub fn encode_repeated_ref(tag: u32, values: &[&[u8]], buf: &mut impl BufMut) {
+        for value in values {
+            encode_ref(tag, value, buf);
+        }
+    }
+
+    /// Encode repeated arena bytes from BumpVec
+    pub fn encode_repeated_arena<'a>(
+        tag: u32,
+        values: &crate::arena::BumpVec<'a, &'a [u8]>,
+        buf: &mut impl BufMut,
+    ) {
+        for value in values.iter() {
+            encode_ref(tag, value, buf);
+        }
+    }
+
+    /// Merge repeated bytes into arena BumpVec
+    pub fn merge_repeated_arena<'a>(
+        wire_type: WireType,
+        values: &mut crate::arena::BumpVec<'a, &'a [u8]>,
+        buf: &mut impl Buf,
+        arena: &'a crate::Arena,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError> {
+        check_wire_type(WireType::LengthDelimited, wire_type)?;
+        let value = merge_arena(wire_type, buf, arena, ctx)?;
+        values.push(value);
+        Ok(())
+    }
+
+    #[inline]
+    pub fn encoded_len_repeated_ref(tag: u32, values: &[&[u8]]) -> usize {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|value| encoded_len_varint(value.len() as u64) + value.len())
+                .sum::<usize>()
+    }
+
+    #[inline]
+    pub fn encoded_len_repeated_arena<'a>(
+        tag: u32,
+        values: &crate::arena::BumpVec<'a, &'a [u8]>,
+    ) -> usize {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|value| encoded_len_varint(value.len() as u64) + value.len())
+                .sum::<usize>()
+    }
 
     #[cfg(test)]
     mod test {
@@ -784,24 +1049,26 @@ pub mod bytes {
 
 pub mod message {
     use super::*;
+    use crate::Arena;
 
-    pub fn encode<M>(tag: u32, msg: &M, buf: &mut impl BufMut)
+    pub fn encode<'a, M>(tag: u32, msg: &M, buf: &mut impl BufMut)
     where
-        M: Message,
+        M: Message<'a>,
     {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(msg.encoded_len() as u64, buf);
         msg.encode_raw(buf);
     }
 
-    pub fn merge<M, B>(
+    pub fn merge<'arena, M, B>(
         wire_type: WireType,
         msg: &mut M,
         buf: &mut B,
+        arena: &'arena Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message,
+        M: Message<'arena>,
         B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
@@ -812,54 +1079,55 @@ pub mod message {
             ctx.enter_recursion(),
             |msg: &mut M, buf: &mut B, ctx| {
                 let (tag, wire_type) = decode_key(buf)?;
-                msg.merge_field(tag, wire_type, buf, ctx)
+                msg.merge_field(tag, wire_type, buf, arena, ctx)
             },
         )
     }
 
     pub fn encode_repeated<M>(tag: u32, messages: &[M], buf: &mut impl BufMut)
     where
-        M: Message,
+        M: for<'a> Message<'a>,
     {
         for msg in messages {
             encode(tag, msg, buf);
         }
     }
 
-    pub fn merge_repeated<M>(
+    pub fn merge_repeated<'arena, M>(
         wire_type: WireType,
         messages: &mut Vec<M>,
         buf: &mut impl Buf,
+        arena: &'arena Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message + Default,
+        M: Message<'arena> + Default,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let mut msg = M::default();
-        merge(WireType::LengthDelimited, &mut msg, buf, ctx)?;
+        merge(WireType::LengthDelimited, &mut msg, buf, arena, ctx)?;
         messages.push(msg);
         Ok(())
     }
 
     #[inline]
-    pub fn encoded_len<M>(tag: u32, msg: &M) -> usize
+    pub fn encoded_len<'a, M>(tag: u32, msg: &M) -> usize
     where
-        M: Message,
+        M: Message<'a>,
     {
         let len = msg.encoded_len();
         key_len(tag) + encoded_len_varint(len as u64) + len
     }
 
     #[inline]
-    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M]) -> usize
+    pub fn encoded_len_repeated<'a, M>(tag: u32, messages: &[M]) -> usize
     where
-        M: Message,
+        M: Message<'a>,
     {
         key_len(tag) * messages.len()
             + messages
                 .iter()
-                .map(Message::encoded_len)
+                .map(|msg: &M| msg.encoded_len())
                 .map(|len| len + encoded_len_varint(len as u64))
                 .sum::<usize>()
     }
@@ -867,25 +1135,27 @@ pub mod message {
 
 pub mod group {
     use super::*;
+    use crate::Arena;
 
-    pub fn encode<M>(tag: u32, msg: &M, buf: &mut impl BufMut)
+    pub fn encode<'a, M>(tag: u32, msg: &M, buf: &mut impl BufMut)
     where
-        M: Message,
+        M: Message<'a>,
     {
         encode_key(tag, WireType::StartGroup, buf);
         msg.encode_raw(buf);
         encode_key(tag, WireType::EndGroup, buf);
     }
 
-    pub fn merge<M>(
+    pub fn merge<'arena, M>(
         tag: u32,
         wire_type: WireType,
         msg: &mut M,
         buf: &mut impl Buf,
+        arena: &'arena Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message,
+        M: Message<'arena>,
     {
         check_wire_type(WireType::StartGroup, wire_type)?;
 
@@ -899,48 +1169,49 @@ pub mod group {
                 return Ok(());
             }
 
-            M::merge_field(msg, field_tag, field_wire_type, buf, ctx.enter_recursion())?;
+            msg.merge_field(field_tag, field_wire_type, buf, arena, ctx.enter_recursion())?;
         }
     }
 
-    pub fn encode_repeated<M>(tag: u32, messages: &[M], buf: &mut impl BufMut)
+    pub fn encode_repeated<'a, M>(tag: u32, messages: &[M], buf: &mut impl BufMut)
     where
-        M: Message,
+        M: Message<'a>,
     {
         for msg in messages {
             encode(tag, msg, buf);
         }
     }
 
-    pub fn merge_repeated<M>(
+    pub fn merge_repeated<'arena, M>(
         tag: u32,
         wire_type: WireType,
         messages: &mut Vec<M>,
         buf: &mut impl Buf,
+        arena: &'arena Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message + Default,
+        M: Message<'arena> + Default,
     {
         check_wire_type(WireType::StartGroup, wire_type)?;
         let mut msg = M::default();
-        merge(tag, WireType::StartGroup, &mut msg, buf, ctx)?;
+        merge(tag, WireType::StartGroup, &mut msg, buf, arena, ctx)?;
         messages.push(msg);
         Ok(())
     }
 
     #[inline]
-    pub fn encoded_len<M>(tag: u32, msg: &M) -> usize
+    pub fn encoded_len<'a, M>(tag: u32, msg: &M) -> usize
     where
-        M: Message,
+        M: Message<'a>,
     {
         2 * key_len(tag) + msg.encoded_len()
     }
 
     #[inline]
-    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M]) -> usize
+    pub fn encoded_len_repeated<'a, M>(tag: u32, messages: &[M]) -> usize
     where
-        M: Message,
+        M: Message<'a>,
     {
         2 * key_len(tag) * messages.len() + messages.iter().map(Message::encoded_len).sum::<usize>()
     }
@@ -1141,6 +1412,194 @@ pub mod hash_map {
 
 pub mod btree_map {
     map!(BTreeMap);
+}
+
+/// Arena-allocated map encoding functions.
+///
+/// These functions work with BumpVec during decoding (accumulating entries)
+/// and with slices during encoding (from ArenaMap).
+pub mod arena_map {
+    use crate::arena::BumpVec;
+    use crate::encoding::*;
+    use core::hash::Hash;
+
+    /// Generic protobuf map merge function for arena-allocated maps.
+    ///
+    /// Accumulates entries into a BumpVec during decoding.
+    pub fn merge<'arena, K, V, B, KM, VM>(
+        key_merge: KM,
+        val_merge: VM,
+        values: &mut BumpVec<'arena, (K, V)>,
+        buf: &mut B,
+        arena: &'arena crate::Arena,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        K: Default,
+        V: Default,
+        B: Buf,
+        KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+        VM: Fn(WireType, &mut V, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+    {
+        merge_with_default(key_merge, val_merge, V::default(), values, buf, arena, ctx)
+    }
+
+    /// Generic protobuf map merge function with an overridden value default.
+    ///
+    /// This is necessary because enumeration values can have a default value other
+    /// than 0 in proto2.
+    pub fn merge_with_default<'arena, K, V, B, KM, VM>(
+        key_merge: KM,
+        val_merge: VM,
+        val_default: V,
+        values: &mut BumpVec<'arena, (K, V)>,
+        buf: &mut B,
+        arena: &'arena crate::Arena,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        K: Default,
+        B: Buf,
+        KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+        VM: Fn(WireType, &mut V, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+    {
+        let mut key = Default::default();
+        let mut val = val_default;
+        ctx.limit_reached()?;
+        merge_loop(
+            &mut (&mut key, &mut val),
+            buf,
+            ctx.enter_recursion(),
+            |&mut (ref mut key, ref mut val), buf, ctx| {
+                let (tag, wire_type) = decode_key(buf)?;
+                match tag {
+                    1 => key_merge(wire_type, key, buf, arena, ctx),
+                    2 => val_merge(wire_type, val, buf, arena, ctx),
+                    _ => skip_field(wire_type, tag, buf, ctx),
+                }
+            },
+        )?;
+        values.push((key, val));
+
+        Ok(())
+    }
+
+    /// Generic protobuf map encode function for arena-allocated maps.
+    ///
+    /// Encodes from a slice (typically from ArenaMap).
+    pub fn encode<K, V, B, KE, KL, VE, VL>(
+        key_encode: KE,
+        key_encoded_len: KL,
+        val_encode: VE,
+        val_encoded_len: VL,
+        tag: u32,
+        values: &[(K, V)],
+        buf: &mut B,
+    ) where
+        K: Default + PartialEq,
+        V: Default + PartialEq,
+        B: BufMut,
+        KE: Fn(u32, &K, &mut B),
+        KL: Fn(u32, &K) -> usize,
+        VE: Fn(u32, &V, &mut B),
+        VL: Fn(u32, &V) -> usize,
+    {
+        encode_with_default(
+            key_encode,
+            key_encoded_len,
+            val_encode,
+            val_encoded_len,
+            &V::default(),
+            tag,
+            values,
+            buf,
+        )
+    }
+
+    /// Generic protobuf map encode function with an overridden value default.
+    pub fn encode_with_default<K, V, B, KE, KL, VE, VL>(
+        key_encode: KE,
+        key_encoded_len: KL,
+        val_encode: VE,
+        val_encoded_len: VL,
+        val_default: &V,
+        tag: u32,
+        values: &[(K, V)],
+        buf: &mut B,
+    ) where
+        K: Default + PartialEq,
+        V: PartialEq,
+        B: BufMut,
+        KE: Fn(u32, &K, &mut B),
+        KL: Fn(u32, &K) -> usize,
+        VE: Fn(u32, &V, &mut B),
+        VL: Fn(u32, &V) -> usize,
+    {
+        for (key, val) in values.iter() {
+            let skip_key = key == &K::default();
+            let skip_val = val == val_default;
+
+            let len = (if skip_key { 0 } else { key_encoded_len(1, key) })
+                + (if skip_val { 0 } else { val_encoded_len(2, val) });
+
+            encode_key(tag, WireType::LengthDelimited, buf);
+            encode_varint(len as u64, buf);
+            if !skip_key {
+                key_encode(1, key, buf);
+            }
+            if !skip_val {
+                val_encode(2, val, buf);
+            }
+        }
+    }
+
+    /// Generic protobuf map encoded length function for arena-allocated maps.
+    pub fn encoded_len<K, V, KL, VL>(
+        key_encoded_len: KL,
+        val_encoded_len: VL,
+        tag: u32,
+        values: &[(K, V)],
+    ) -> usize
+    where
+        K: Default + PartialEq,
+        V: Default + PartialEq,
+        KL: Fn(u32, &K) -> usize,
+        VL: Fn(u32, &V) -> usize,
+    {
+        encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values)
+    }
+
+    /// Generic protobuf map encoded length function with an overridden value default.
+    pub fn encoded_len_with_default<K, V, KL, VL>(
+        key_encoded_len: KL,
+        val_encoded_len: VL,
+        val_default: &V,
+        tag: u32,
+        values: &[(K, V)],
+    ) -> usize
+    where
+        K: Default + PartialEq,
+        V: PartialEq,
+        KL: Fn(u32, &K) -> usize,
+        VL: Fn(u32, &V) -> usize,
+    {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|(key, val)| {
+                    let len = (if key == &K::default() {
+                        0
+                    } else {
+                        key_encoded_len(1, key)
+                    }) + (if val == val_default {
+                        0
+                    } else {
+                        val_encoded_len(2, val)
+                    });
+                    encoded_len_varint(len as u64) + len
+                })
+                .sum::<usize>()
+    }
 }
 
 #[cfg(test)]

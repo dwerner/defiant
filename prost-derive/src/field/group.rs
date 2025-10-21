@@ -98,14 +98,15 @@ impl Field {
                     wire_type,
                     #ident.get_or_insert_with(::core::default::Default::default),
                     buf,
+                    arena,
                     ctx,
                 )
             },
             Label::Required => quote! {
-                #prost_path::encoding::group::merge(tag, wire_type, #ident, buf, ctx)
+                #prost_path::encoding::group::merge(tag, wire_type, #ident, buf, arena, ctx)
             },
             Label::Repeated => quote! {
-                #prost_path::encoding::group::merge_repeated(tag, wire_type, #ident, buf, ctx)
+                #prost_path::encoding::group::merge_repeated(tag, wire_type, #ident, buf, arena, ctx)
             },
         }
     }

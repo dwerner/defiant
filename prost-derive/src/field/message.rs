@@ -75,16 +75,25 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                if let Some(ref msg) = #ident {
-                    #prost_path::encoding::message::encode(#tag, msg, buf);
+                if let Some(msg) = #ident {
+                    #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
+                    #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
+                    msg.encode_raw(buf);
                 }
             },
             Label::Required => quote! {
-                #prost_path::encoding::message::encode(#tag, &#ident, buf);
+                {
+                    let msg = &#ident;
+                    #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
+                    #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
+                    msg.encode_raw(buf);
+                }
             },
             Label::Repeated => quote! {
-                for msg in &#ident {
-                    #prost_path::encoding::message::encode(#tag, msg, buf);
+                for msg in #ident.iter() {
+                    #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
+                    #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
+                    msg.encode_raw(buf);
                 }
             },
         }
@@ -96,13 +105,14 @@ impl Field {
                 #prost_path::encoding::message::merge(wire_type,
                                                  #ident.get_or_insert_with(::core::default::Default::default),
                                                  buf,
+                                                 arena,
                                                  ctx)
             },
             Label::Required => quote! {
-                #prost_path::encoding::message::merge(wire_type, #ident, buf, ctx)
+                #prost_path::encoding::message::merge(wire_type, #ident, buf, arena, ctx)
             },
             Label::Repeated => quote! {
-                #prost_path::encoding::message::merge_repeated(wire_type, #ident, buf, ctx)
+                #prost_path::encoding::message::merge_repeated(wire_type, #ident, buf, arena, ctx)
             },
         }
     }
@@ -111,13 +121,29 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                #ident.as_ref().map_or(0, |msg| #prost_path::encoding::message::encoded_len(#tag, msg))
+                match &#ident {
+                    Some(msg) => {
+                        let len: usize = msg.encoded_len();
+                        #prost_path::encoding::key_len(#tag) + #prost_path::encoding::encoded_len_varint(len as u64) + len
+                    }
+                    None => 0,
+                }
             },
             Label::Required => quote! {
-                #prost_path::encoding::message::encoded_len(#tag, &#ident)
+                {
+                    let len = #ident.encoded_len();
+                    #prost_path::encoding::key_len(#tag) + #prost_path::encoding::encoded_len_varint(len as u64) + len
+                }
             },
             Label::Repeated => quote! {
-                #prost_path::encoding::message::encoded_len_repeated(#tag, &#ident)
+                {
+                    #prost_path::encoding::key_len(#tag) * #ident.len()
+                        + #ident
+                            .iter()
+                            .map(|msg| msg.encoded_len())
+                            .map(|len| len + #prost_path::encoding::encoded_len_varint(len as u64))
+                            .sum::<usize>()
+                }
             },
         }
     }

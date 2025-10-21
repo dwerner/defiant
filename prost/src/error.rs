@@ -94,7 +94,8 @@ pub struct EncodeError {
 
 impl EncodeError {
     /// Creates a new `EncodeError`.
-    pub(crate) fn new(required: usize, remaining: usize) -> EncodeError {
+    #[doc(hidden)]
+    pub fn new(required: usize, remaining: usize) -> EncodeError {
         EncodeError {
             required,
             remaining,

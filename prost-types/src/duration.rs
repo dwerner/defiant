@@ -1,6 +1,6 @@
 use super::*;
 
-impl Duration {
+impl Duration<'_> {
     /// Normalizes the duration to a canonical format.
     ///
     /// Based on [`google::protobuf::util::CreateNormalized`][1].
@@ -63,7 +63,7 @@ impl Duration {
     }
 }
 
-impl Name for Duration {
+impl<'arena> Name for Duration<'arena> {
     const PACKAGE: &'static str = PACKAGE;
     const NAME: &'static str = "Duration";
 
@@ -72,24 +72,24 @@ impl Name for Duration {
     }
 }
 
-impl TryFrom<time::Duration> for Duration {
+impl<'arena> TryFrom<time::Duration> for Duration<'arena> {
     type Error = DurationError;
 
     /// Converts a `std::time::Duration` to a `Duration`, failing if the duration is too large.
-    fn try_from(duration: time::Duration) -> Result<Duration, DurationError> {
+    fn try_from(duration: time::Duration) -> Result<Duration<'arena>, DurationError> {
         let seconds = i64::try_from(duration.as_secs()).map_err(|_| DurationError::OutOfRange)?;
         let nanos = duration.subsec_nanos() as i32;
 
-        let duration = Duration { seconds, nanos };
+        let duration = Duration { seconds, nanos, _phantom: ::core::marker::PhantomData };
         Ok(duration.normalized())
     }
 }
 
-impl TryFrom<Duration> for time::Duration {
+impl<'arena> TryFrom<Duration<'arena>> for time::Duration {
     type Error = DurationError;
 
     /// Converts a `Duration` to a `std::time::Duration`, failing if the duration is negative.
-    fn try_from(mut duration: Duration) -> Result<time::Duration, DurationError> {
+    fn try_from(mut duration: Duration<'arena>) -> Result<time::Duration, DurationError> {
         duration.normalize();
         if duration.seconds >= 0 && duration.nanos >= 0 {
             Ok(time::Duration::new(
@@ -105,7 +105,7 @@ impl TryFrom<Duration> for time::Duration {
     }
 }
 
-impl fmt::Display for Duration {
+impl<'arena> fmt::Display for Duration<'arena> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let d = self.normalized();
         if self.seconds < 0 || self.nanos < 0 {
@@ -167,7 +167,7 @@ impl fmt::Display for DurationError {
 #[cfg(feature = "std")]
 impl std::error::Error for DurationError {}
 
-impl FromStr for Duration {
+impl<'arena> FromStr for Duration<'arena> {
     type Err = DurationError;
 
     fn from_str(s: &str) -> Result<Duration, DurationError> {
@@ -181,7 +181,7 @@ mod chrono {
 
     use super::*;
 
-    impl From<::chrono::TimeDelta> for Duration {
+    impl From<::chrono::TimeDelta> for Duration<'arena> {
         fn from(value: ::chrono::TimeDelta) -> Self {
             let mut result = Self {
                 seconds: value.num_seconds(),
@@ -228,6 +228,7 @@ mod proofs {
             let neg_prost_duration = Duration {
                 seconds: -prost_duration.seconds,
                 nanos: -prost_duration.nanos,
+                _phantom: ::core::marker::PhantomData,
             };
 
             assert!(matches!(
@@ -256,6 +257,7 @@ mod proofs {
             let neg_prost_duration = Duration {
                 seconds: -prost_duration.seconds,
                 nanos: -prost_duration.nanos,
+                _phantom: ::core::marker::PhantomData,
             };
 
             assert!(matches!(
@@ -270,7 +272,7 @@ mod proofs {
     fn check_duration_chrono_roundtrip() {
         let seconds = kani::any();
         let nanos = kani::any();
-        let prost_duration = Duration { seconds, nanos };
+        let prost_duration = Duration { seconds, nanos, _phantom: ::core::marker::PhantomData };
         match ::chrono::TimeDelta::try_from(prost_duration) {
             Err(DurationError::OutOfRange) => {
                 // Test case not valid: duration out of range
@@ -302,42 +304,48 @@ mod tests {
             Duration::from_str("0s"),
             Ok(Duration {
                 seconds: 0,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
             Duration::from_str("123s"),
             Ok(Duration {
                 seconds: 123,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
             Duration::from_str("0.123s"),
             Ok(Duration {
                 seconds: 0,
-                nanos: 123_000_000
+                nanos: 123_000_000,
+                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
             Duration::from_str("-123s"),
             Ok(Duration {
                 seconds: -123,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
             Duration::from_str("-0.123s"),
             Ok(Duration {
                 seconds: 0,
-                nanos: -123_000_000
+                nanos: -123_000_000,
+                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
             Duration::from_str("22041211.6666666666666s"),
             Ok(Duration {
                 seconds: 22041211,
-                nanos: 666_666_666
+                nanos: 666_666_666,
+                _phantom: ::core::marker::PhantomData,
             })
         );
     }
@@ -349,7 +357,8 @@ mod tests {
             "0s",
             Duration {
                 seconds: 0,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );
@@ -357,7 +366,8 @@ mod tests {
             "123s",
             Duration {
                 seconds: 123,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );
@@ -365,7 +375,8 @@ mod tests {
             "0.123s",
             Duration {
                 seconds: 0,
-                nanos: 123_000_000
+                nanos: 123_000_000,
+                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );
@@ -373,7 +384,8 @@ mod tests {
             "-123s",
             Duration {
                 seconds: -123,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );

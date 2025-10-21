@@ -4,15 +4,15 @@ use crate::String;
 use crate::Vec;
 use ::prost::alloc::collections::BTreeMap;
 
-impl From<value::Kind> for Value {
-    fn from(value: value::Kind) -> Self {
+impl<'arena> From<value::Kind<'arena>> for Value<'arena> {
+    fn from(value: value::Kind<'arena>) -> Self {
         Value { kind: Some(value) }
     }
 }
 
 macro_rules! impl_number_value {
     ($t: ty) => {
-        impl From<$t> for Value {
+        impl<'arena> From<$t> for Value<'arena> {
             fn from(value: $t) -> Self {
                 value::Kind::NumberValue(value.into()).into()
             }
@@ -31,32 +31,32 @@ impl_number_value!(i32);
 impl_number_value!(f32);
 impl_number_value!(f64);
 
-impl From<bool> for Value {
+impl<'arena> From<bool> for Value<'arena> {
     fn from(value: bool) -> Self {
         value::Kind::BoolValue(value).into()
     }
 }
 
-impl From<String> for Value {
+impl<'arena> From<String> for Value<'arena> {
     fn from(value: String) -> Self {
         value::Kind::StringValue(value).into()
     }
 }
 
-impl From<&str> for Value {
+impl<'arena> From<&str> for Value<'arena> {
     fn from(value: &str) -> Self {
         value::Kind::StringValue(value.into()).into()
     }
 }
 
-impl From<Vec<Value>> for Value {
-    fn from(value: Vec<Value>) -> Self {
+impl<'arena> From<Vec<Value<'arena>>> for Value<'arena> {
+    fn from(value: Vec<Value<'arena>>) -> Self {
         value::Kind::ListValue(crate::protobuf::ListValue { values: value }).into()
     }
 }
 
-impl From<BTreeMap<String, Value>> for Value {
-    fn from(value: BTreeMap<String, Value>) -> Self {
+impl<'arena> From<BTreeMap<String, Value<'arena>>> for Value<'arena> {
+    fn from(value: BTreeMap<String, Value<'arena>>) -> Self {
         value::Kind::StructValue(crate::protobuf::Struct { fields: value }).into()
     }
 }

@@ -107,9 +107,24 @@ impl Field {
 
     pub fn encode(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
+
+        // For arena String/Bytes types, use encode_ref instead of encode
         let encode_fn = match self.kind {
-            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => quote!(encode),
-            Kind::Repeated => quote!(encode_repeated),
+            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => {
+                if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(encode_ref)
+                } else {
+                    quote!(encode)
+                }
+            },
+            Kind::Repeated => {
+                // For repeated strings/bytes, use arena version
+                if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(encode_repeated_arena)
+                } else {
+                    quote!(encode_repeated)
+                }
+            },
             Kind::Packed => quote!(encode_packed),
         };
         let encode_fn = quote!(#prost_path::encoding::#module::#encode_fn);
@@ -117,10 +132,25 @@ impl Field {
 
         match self.kind {
             Kind::Plain(ref default) => {
-                let default = default.typed();
+                // For strings, use .is_empty() instead of comparing with ""
+                let condition = match self.ty {
+                    Ty::String => quote!(!#ident.is_empty()),
+                    Ty::Bytes(_) => quote!(!#ident.is_empty()),
+                    _ => {
+                        let default = default.typed();
+                        quote!(#ident != #default)
+                    }
+                };
+                // For string/bytes types using encode_ref, pass value directly (no &)
+                // For other types, pass by reference
+                let param = if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(#ident)
+                } else {
+                    quote!(&#ident)
+                };
                 quote! {
-                    if #ident != #default {
-                        #encode_fn(#tag, &#ident, buf);
+                    if #condition {
+                        #encode_fn(#tag, #param, buf);
                     }
                 }
             }
@@ -139,31 +169,80 @@ impl Field {
     /// scalar value into the field.
     pub fn merge(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
+
+        // For arena types (String, Bytes), use merge_arena which returns a value
+        let uses_arena = matches!(self.ty, Ty::String | Ty::Bytes(_));
+
         let merge_fn = match self.kind {
-            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => quote!(merge),
-            Kind::Repeated | Kind::Packed => quote!(merge_repeated),
+            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => {
+                if uses_arena {
+                    quote!(merge_arena)
+                } else {
+                    quote!(merge)
+                }
+            },
+            Kind::Repeated | Kind::Packed => {
+                if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(merge_repeated_arena)
+                } else {
+                    quote!(merge_repeated)
+                }
+            },
         };
         let merge_fn = quote!(#prost_path::encoding::#module::#merge_fn);
 
-        match self.kind {
-            Kind::Plain(..) | Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
-                #merge_fn(wire_type, #ident, buf, ctx)
-            },
-            Kind::Optional(..) => quote! {
-                #merge_fn(wire_type,
-                          #ident.get_or_insert_with(::core::default::Default::default),
-                          buf,
-                          ctx)
-            },
+        // For arena types, generate assignment instead of mutation
+        if uses_arena {
+            match self.kind {
+                Kind::Plain(..) | Kind::Required(..) => quote! {
+                    #merge_fn(wire_type, buf, arena, ctx).map(|v| *#ident = v)
+                },
+                Kind::Optional(..) => quote! {
+                    #merge_fn(wire_type, buf, arena, ctx).map(|v| *#ident = Some(v))
+                },
+                Kind::Repeated | Kind::Packed => {
+                    // Repeated strings accumulate into BumpVec with arena allocation
+                    quote! {
+                        #merge_fn(wire_type, #ident, buf, arena, ctx)
+                    }
+                }
+            }
+        } else {
+            // Regular scalars use mutation
+            match self.kind {
+                Kind::Plain(..) | Kind::Required(..) | Kind::Repeated | Kind::Packed => quote! {
+                    #merge_fn(wire_type, #ident, buf, ctx)
+                },
+                Kind::Optional(..) => quote! {
+                    #merge_fn(wire_type,
+                              #ident.get_or_insert_with(::core::default::Default::default),
+                              buf,
+                              ctx)
+                },
+            }
         }
     }
 
     /// Returns an expression which evaluates to the encoded length of the field.
     pub fn encoded_len(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         let module = self.ty.module();
+
+        // For arena String/Bytes types, use encoded_len_ref instead of encoded_len
         let encoded_len_fn = match self.kind {
-            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => quote!(encoded_len),
-            Kind::Repeated => quote!(encoded_len_repeated),
+            Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => {
+                if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(encoded_len_ref)
+                } else {
+                    quote!(encoded_len)
+                }
+            },
+            Kind::Repeated => {
+                if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(encoded_len_repeated_arena)
+                } else {
+                    quote!(encoded_len_repeated)
+                }
+            },
             Kind::Packed => quote!(encoded_len_packed),
         };
         let encoded_len_fn = quote!(#prost_path::encoding::#module::#encoded_len_fn);
@@ -171,10 +250,25 @@ impl Field {
 
         match self.kind {
             Kind::Plain(ref default) => {
-                let default = default.typed();
+                // For strings, use .is_empty() instead of comparing with ""
+                let condition = match self.ty {
+                    Ty::String => quote!(!#ident.is_empty()),
+                    Ty::Bytes(_) => quote!(!#ident.is_empty()),
+                    _ => {
+                        let default = default.typed();
+                        quote!(#ident != #default)
+                    }
+                };
+                // For string/bytes types using encoded_len_ref, pass value directly (no &)
+                // For other types, pass by reference
+                let param = if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
+                    quote!(#ident)
+                } else {
+                    quote!(&#ident)
+                };
                 quote! {
-                    if #ident != #default {
-                        #encoded_len_fn(#tag, &#ident)
+                    if #condition {
+                        #encoded_len_fn(#tag, #param)
                     } else {
                         0
                     }
@@ -193,22 +287,34 @@ impl Field {
         match self.kind {
             Kind::Plain(ref default) | Kind::Required(ref default) => {
                 let default = default.typed();
-                match self.ty {
-                    Ty::String | Ty::Bytes(..) => quote!(#ident.clear()),
-                    _ => quote!(#ident = #default),
-                }
+                quote!(#ident = #default)
             }
             Kind::Optional(_) => quote!(#ident = ::core::option::Option::None),
             Kind::Repeated | Kind::Packed => quote!(#ident.clear()),
         }
     }
 
+    /// Returns true if this is a repeated or packed field.
+    pub fn is_repeated(&self) -> bool {
+        matches!(self.kind, Kind::Repeated | Kind::Packed)
+    }
+
     /// Returns an expression which evaluates to the default value of the field.
     pub fn default(&self, prost_path: &Path) -> TokenStream {
         match self.kind {
-            Kind::Plain(ref value) | Kind::Required(ref value) => value.owned(prost_path),
+            Kind::Plain(ref value) | Kind::Required(ref value) => {
+                // For arena types (String, Bytes), use typed() which returns literals like ""
+                // that work for both owned (String) and borrowed (&'arena str) types
+                match self.ty {
+                    Ty::String | Ty::Bytes(_) => value.typed(),
+                    _ => value.owned(prost_path),
+                }
+            }
             Kind::Optional(_) => quote!(::core::option::Option::None),
-            Kind::Repeated | Kind::Packed => quote!(#prost_path::alloc::vec::Vec::new()),
+            Kind::Repeated | Kind::Packed => {
+                // For repeated fields, start with empty slice (allocated in arena)
+                quote!(&[])
+            }
         }
     }
 

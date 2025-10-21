@@ -1,6 +1,6 @@
 use super::*;
 
-impl Any {
+impl Any<'_> {
     /// Serialize the given message type `M` as [`Any`].
     pub fn from_msg<M>(msg: &M) -> Result<Self, EncodeError>
     where
@@ -9,7 +9,7 @@ impl Any {
         let type_url = M::type_url();
         let mut value = Vec::new();
         Message::encode(msg, &mut value)?;
-        Ok(Any { type_url, value })
+        Ok(Any { type_url, value, _phantom: ::core::marker::PhantomData })
     }
 
     /// Decode the given message type `M` from [`Any`], validating that it has
@@ -38,7 +38,7 @@ impl Any {
     }
 }
 
-impl Name for Any {
+impl<'arena> Name for Any<'arena> {
     const PACKAGE: &'static str = PACKAGE;
     const NAME: &'static str = "Any";
 
