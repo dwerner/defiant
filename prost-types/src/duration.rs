@@ -1,6 +1,6 @@
 use super::*;
 
-impl Duration<'_> {
+impl Duration {
     /// Normalizes the duration to a canonical format.
     ///
     /// Based on [`google::protobuf::util::CreateNormalized`][1].
@@ -63,7 +63,7 @@ impl Duration<'_> {
     }
 }
 
-impl<'arena> Name for Duration<'arena> {
+impl Name for Duration {
     const PACKAGE: &'static str = PACKAGE;
     const NAME: &'static str = "Duration";
 
@@ -72,24 +72,24 @@ impl<'arena> Name for Duration<'arena> {
     }
 }
 
-impl<'arena> TryFrom<time::Duration> for Duration<'arena> {
+impl TryFrom<time::Duration> for Duration {
     type Error = DurationError;
 
     /// Converts a `std::time::Duration` to a `Duration`, failing if the duration is too large.
-    fn try_from(duration: time::Duration) -> Result<Duration<'arena>, DurationError> {
+    fn try_from(duration: time::Duration) -> Result<Duration, DurationError> {
         let seconds = i64::try_from(duration.as_secs()).map_err(|_| DurationError::OutOfRange)?;
         let nanos = duration.subsec_nanos() as i32;
 
-        let duration = Duration { seconds, nanos, _phantom: ::core::marker::PhantomData };
+        let duration = Duration { seconds, nanos };
         Ok(duration.normalized())
     }
 }
 
-impl<'arena> TryFrom<Duration<'arena>> for time::Duration {
+impl TryFrom<Duration> for time::Duration {
     type Error = DurationError;
 
     /// Converts a `Duration` to a `std::time::Duration`, failing if the duration is negative.
-    fn try_from(mut duration: Duration<'arena>) -> Result<time::Duration, DurationError> {
+    fn try_from(mut duration: Duration) -> Result<time::Duration, DurationError> {
         duration.normalize();
         if duration.seconds >= 0 && duration.nanos >= 0 {
             Ok(time::Duration::new(
@@ -105,7 +105,7 @@ impl<'arena> TryFrom<Duration<'arena>> for time::Duration {
     }
 }
 
-impl<'arena> fmt::Display for Duration<'arena> {
+impl fmt::Display for Duration {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let d = self.normalized();
         if self.seconds < 0 || self.nanos < 0 {
@@ -167,7 +167,7 @@ impl fmt::Display for DurationError {
 #[cfg(feature = "std")]
 impl std::error::Error for DurationError {}
 
-impl<'arena> FromStr for Duration<'arena> {
+impl FromStr for Duration {
     type Err = DurationError;
 
     fn from_str(s: &str) -> Result<Duration, DurationError> {
@@ -181,7 +181,7 @@ mod chrono {
 
     use super::*;
 
-    impl From<::chrono::TimeDelta> for Duration<'arena> {
+    impl From<::chrono::TimeDelta> for Duration {
         fn from(value: ::chrono::TimeDelta) -> Self {
             let mut result = Self {
                 seconds: value.num_seconds(),
@@ -228,7 +228,6 @@ mod proofs {
             let neg_prost_duration = Duration {
                 seconds: -prost_duration.seconds,
                 nanos: -prost_duration.nanos,
-                _phantom: ::core::marker::PhantomData,
             };
 
             assert!(matches!(
@@ -257,7 +256,6 @@ mod proofs {
             let neg_prost_duration = Duration {
                 seconds: -prost_duration.seconds,
                 nanos: -prost_duration.nanos,
-                _phantom: ::core::marker::PhantomData,
             };
 
             assert!(matches!(
@@ -272,7 +270,7 @@ mod proofs {
     fn check_duration_chrono_roundtrip() {
         let seconds = kani::any();
         let nanos = kani::any();
-        let prost_duration = Duration { seconds, nanos, _phantom: ::core::marker::PhantomData };
+        let prost_duration = Duration { seconds, nanos };
         match ::chrono::TimeDelta::try_from(prost_duration) {
             Err(DurationError::OutOfRange) => {
                 // Test case not valid: duration out of range
@@ -305,7 +303,6 @@ mod tests {
             Ok(Duration {
                 seconds: 0,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
@@ -313,7 +310,6 @@ mod tests {
             Ok(Duration {
                 seconds: 123,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
@@ -321,7 +317,6 @@ mod tests {
             Ok(Duration {
                 seconds: 0,
                 nanos: 123_000_000,
-                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
@@ -329,7 +324,6 @@ mod tests {
             Ok(Duration {
                 seconds: -123,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
@@ -337,7 +331,6 @@ mod tests {
             Ok(Duration {
                 seconds: 0,
                 nanos: -123_000_000,
-                _phantom: ::core::marker::PhantomData,
             })
         );
         assert_eq!(
@@ -345,7 +338,6 @@ mod tests {
             Ok(Duration {
                 seconds: 22041211,
                 nanos: 666_666_666,
-                _phantom: ::core::marker::PhantomData,
             })
         );
     }
@@ -358,7 +350,6 @@ mod tests {
             Duration {
                 seconds: 0,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );
@@ -367,7 +358,6 @@ mod tests {
             Duration {
                 seconds: 123,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );
@@ -376,7 +366,6 @@ mod tests {
             Duration {
                 seconds: 0,
                 nanos: 123_000_000,
-                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );
@@ -385,7 +374,6 @@ mod tests {
             Duration {
                 seconds: -123,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData,
             }
             .to_string()
         );

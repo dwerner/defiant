@@ -1,6 +1,6 @@
 use super::*;
 
-impl Timestamp<'_> {
+impl Timestamp {
     /// Normalizes the timestamp to a canonical format.
     ///
     /// Based on [`google::protobuf::util::CreateNormalized`][1].
@@ -49,7 +49,7 @@ impl Timestamp<'_> {
     /// Normalization is based on [`google::protobuf::util::CreateNormalized`][1].
     ///
     /// [1]: https://github.com/google/protobuf/blob/v3.3.2/src/google/protobuf/util/time_util.cc#L59-L77
-    pub fn try_normalize<'arena>(mut self) -> Result<Timestamp<'arena>, Timestamp<'arena>> where Self: 'arena {
+    pub fn try_normalize<'arena>(mut self) -> Result<Timestamp, Timestamp> where Self: 'arena {
         let before = self;
         self.normalize();
         // If the seconds value has changed, and is either i64::MIN or i64::MAX, then the timestamp
@@ -74,7 +74,7 @@ impl Timestamp<'_> {
     }
 
     /// Creates a new `Timestamp` at the start of the provided UTC date.
-    pub fn date(year: i64, month: u8, day: u8) -> Result<Timestamp<'static>, TimestampError> {
+    pub fn date(year: i64, month: u8, day: u8) -> Result<Timestamp, TimestampError> {
         Timestamp::date_time_nanos(year, month, day, 0, 0, 0, 0)
     }
 
@@ -86,7 +86,7 @@ impl Timestamp<'_> {
         hour: u8,
         minute: u8,
         second: u8,
-    ) -> Result<Timestamp<'static>, TimestampError> {
+    ) -> Result<Timestamp, TimestampError> {
         Timestamp::date_time_nanos(year, month, day, hour, minute, second, 0)
     }
 
@@ -99,7 +99,7 @@ impl Timestamp<'_> {
         minute: u8,
         second: u8,
         nanos: u32,
-    ) -> Result<Timestamp<'static>, TimestampError> {
+    ) -> Result<Timestamp, TimestampError> {
         let date_time = datetime::DateTime {
             year,
             month,
@@ -114,7 +114,7 @@ impl Timestamp<'_> {
     }
 }
 
-impl<'arena> Name for Timestamp<'arena> {
+impl Name for Timestamp {
     const PACKAGE: &'static str = PACKAGE;
     const NAME: &'static str = "Timestamp";
 
@@ -124,8 +124,8 @@ impl<'arena> Name for Timestamp<'arena> {
 }
 
 #[cfg(feature = "std")]
-impl From<std::time::SystemTime> for Timestamp<'static> {
-    fn from(system_time: std::time::SystemTime) -> Timestamp<'static> {
+impl From<std::time::SystemTime> for Timestamp {
+    fn from(system_time: std::time::SystemTime) -> Timestamp {
         let (seconds, nanos) = match system_time.duration_since(std::time::UNIX_EPOCH) {
             Ok(duration) => {
                 let seconds = i64::try_from(duration.as_secs()).unwrap();
@@ -157,7 +157,7 @@ pub enum TimestampError {
     /// `Timestamp`s are likely representable on 64-bit Unix-like platforms, but other platforms,
     /// such as Windows and 32-bit Linux, may not be able to represent the full range of
     /// `Timestamp`s.
-    OutOfSystemRange(Timestamp<'static>),
+    OutOfSystemRange(Timestamp),
 
     /// An error indicating failure to parse a timestamp in RFC-3339 format.
     ParseFailure,
@@ -189,10 +189,10 @@ impl fmt::Display for TimestampError {
 impl std::error::Error for TimestampError {}
 
 #[cfg(feature = "std")]
-impl<'arena> TryFrom<Timestamp<'arena>> for std::time::SystemTime {
+impl TryFrom<Timestamp> for std::time::SystemTime {
     type Error = TimestampError;
 
-    fn try_from(mut timestamp: Timestamp<'arena>) -> Result<std::time::SystemTime, Self::Error> {
+    fn try_from(mut timestamp: Timestamp) -> Result<std::time::SystemTime, Self::Error> {
         let orig_timestamp = timestamp;
         timestamp.normalize();
 
@@ -215,7 +215,7 @@ impl<'arena> TryFrom<Timestamp<'arena>> for std::time::SystemTime {
     }
 }
 
-impl<'arena> FromStr for Timestamp<'arena> {
+impl FromStr for Timestamp {
     type Err = TimestampError;
 
     fn from_str(s: &str) -> Result<Timestamp, TimestampError> {
@@ -223,7 +223,7 @@ impl<'arena> FromStr for Timestamp<'arena> {
     }
 }
 
-impl<'arena> fmt::Display for Timestamp<'arena> {
+impl fmt::Display for Timestamp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         datetime::DateTime::from(*self).fmt(f)
     }
@@ -284,28 +284,32 @@ mod tests {
             Timestamp::from(UNIX_EPOCH - time::Duration::new(1_001, 0)),
             Timestamp {
                 seconds: -1_001,
-                nanos: 0
+                nanos: 0,
+                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(0, 999_999_900)),
             Timestamp {
                 seconds: -1,
-                nanos: 100
+                nanos: 100,
+                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(2_001_234, 12_300)),
             Timestamp {
                 seconds: -2_001_235,
-                nanos: 999_987_700
+                nanos: 999_987_700,
+                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(768, 65_432_100)),
             Timestamp {
                 seconds: -769,
-                nanos: 934_567_900
+                nanos: 934_567_900,
+                _phantom: ::core::marker::PhantomData
             }
         );
     }
@@ -318,21 +322,24 @@ mod tests {
             Timestamp::from(UNIX_EPOCH - time::Duration::new(0, 999_999_999)),
             Timestamp {
                 seconds: -1,
-                nanos: 1
+                nanos: 1,
+                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(1_234_567, 123)),
             Timestamp {
                 seconds: -1_234_568,
-                nanos: 999_999_877
+                nanos: 999_999_877,
+                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
             Timestamp::from(UNIX_EPOCH - time::Duration::new(890, 987_654_321)),
             Timestamp {
                 seconds: -891,
-                nanos: 12_345_679
+                nanos: 12_345_679,
+                _phantom: ::core::marker::PhantomData
             }
         );
     }
@@ -399,6 +406,7 @@ mod tests {
             let test_timestamp = crate::Timestamp {
                 seconds: case.1,
                 nanos: case.2,
+                _phantom: ::core::marker::PhantomData,
             };
 
             assert_eq!(
@@ -406,6 +414,7 @@ mod tests {
                 crate::Timestamp {
                     seconds: case.3,
                     nanos: case.4,
+                    _phantom: ::core::marker::PhantomData,
                 },
                 "test case on line {} doesn't match",
                 case.0,

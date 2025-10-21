@@ -1,22 +1,27 @@
 use super::*;
+use prost::Arena;
 
-impl Any<'_> {
+impl<'arena> Any<'arena> {
     /// Serialize the given message type `M` as [`Any`].
-    pub fn from_msg<M>(msg: &M) -> Result<Self, EncodeError>
+    pub fn from_msg<M>(msg: &M, arena: &'arena Arena) -> Result<Any<'arena>, EncodeError>
     where
-        M: Name,
+        M: Name + Message<'arena>,
     {
-        let type_url = M::type_url();
-        let mut value = Vec::new();
-        Message::encode(msg, &mut value)?;
+        let type_url_string = M::type_url();
+        let type_url = arena.alloc_str(&type_url_string);
+
+        let mut value_vec = Vec::new();
+        Message::encode(msg, &mut value_vec)?;
+        let value = arena.alloc_slice_copy(&value_vec);
+
         Ok(Any { type_url, value, _phantom: ::core::marker::PhantomData })
     }
 
     /// Decode the given message type `M` from [`Any`], validating that it has
     /// the expected type URL.
-    pub fn to_msg<M>(&self) -> Result<M, DecodeError>
+    pub fn to_msg<M>(&self, arena: &'arena Arena) -> Result<M, DecodeError>
     where
-        M: Default + Name + Sized,
+        M: Message<'arena> + Name + Sized,
     {
         let expected_type_url = M::type_url();
 
@@ -25,7 +30,7 @@ impl Any<'_> {
             TypeUrl::new(&self.type_url),
         ) {
             if expected == actual {
-                return M::decode(self.value.as_slice());
+                return M::decode(self.value, arena);
             }
         }
 
@@ -53,17 +58,18 @@ mod tests {
 
     #[test]
     fn check_any_serialization() {
+        let arena = Arena::new();
         let message = Timestamp::date(2000, 1, 1).unwrap();
-        let any = Any::from_msg(&message).unwrap();
+        let any = Any::from_msg(&message, &arena).unwrap();
         assert_eq!(
             &any.type_url,
             "type.googleapis.com/google.protobuf.Timestamp"
         );
 
-        let message2 = any.to_msg::<Timestamp>().unwrap();
+        let message2 = any.to_msg::<Timestamp>(&arena).unwrap();
         assert_eq!(message, message2);
 
         // Wrong type URL
-        assert!(any.to_msg::<Duration>().is_err());
+        assert!(any.to_msg::<Duration>(&arena).is_err());
     }
 }
