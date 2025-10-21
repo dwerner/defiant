@@ -76,6 +76,7 @@ impl Field {
         match self.label {
             Label::Optional => quote! {
                 if let Some(msg) = #ident {
+                    use #prost_path::Message as _;
                     #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
                     #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
                     msg.encode_raw(buf);
@@ -83,17 +84,21 @@ impl Field {
             },
             Label::Required => quote! {
                 {
-                    let msg = &#ident;
+                    use #prost_path::Message as _;
+                    let msg = &(#ident);
                     #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
                     #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
                     msg.encode_raw(buf);
                 }
             },
             Label::Repeated => quote! {
-                for msg in #ident.iter() {
-                    #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
-                    #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
-                    msg.encode_raw(buf);
+                {
+                    use #prost_path::Message as _;
+                    for msg in #ident.iter() {
+                        #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
+                        #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
+                        msg.encode_raw(buf);
+                    }
                 }
             },
         }
@@ -121,22 +126,27 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                match &#ident {
-                    Some(msg) => {
-                        let len: usize = msg.encoded_len();
-                        #prost_path::encoding::key_len(#tag) + #prost_path::encoding::encoded_len_varint(len as u64) + len
+                {
+                    use #prost_path::Message as _;
+                    match &#ident {
+                        Some(msg) => {
+                            let len: usize = msg.encoded_len();
+                            #prost_path::encoding::key_len(#tag) + #prost_path::encoding::encoded_len_varint(len as u64) + len
+                        }
+                        None => 0,
                     }
-                    None => 0,
                 }
             },
             Label::Required => quote! {
                 {
-                    let len = #ident.encoded_len();
+                    use #prost_path::Message as _;
+                    let len = (#ident).encoded_len();
                     #prost_path::encoding::key_len(#tag) + #prost_path::encoding::encoded_len_varint(len as u64) + len
                 }
             },
             Label::Repeated => quote! {
                 {
+                    use #prost_path::Message as _;
                     #prost_path::encoding::key_len(#tag) * #ident.len()
                         + #ident
                             .iter()

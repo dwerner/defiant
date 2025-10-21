@@ -22,10 +22,9 @@ impl MapTy {
     }
 
     fn module(&self) -> Ident {
-        match *self {
-            MapTy::HashMap => Ident::new("hash_map", Span::call_site()),
-            MapTy::BTreeMap => Ident::new("btree_map", Span::call_site()),
-        }
+        // In arena mode, always use arena_map for map fields
+        // (both hash_map and btree_map use the same arena-allocated encoding)
+        Ident::new("arena_map", Span::call_site())
     }
 
     fn lib(&self) -> TokenStream {
@@ -130,6 +129,8 @@ impl Field {
         let ke = quote!(#prost_path::encoding::#key_mod::encode);
         let kl = quote!(#prost_path::encoding::#key_mod::encoded_len);
         let module = self.map_ty.module();
+        // For ArenaMap, extract the slice
+        let map_value = quote!(#ident.as_slice());
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
                 let default = quote!(#ty::default() as i32);
@@ -141,7 +142,7 @@ impl Field {
                         #prost_path::encoding::int32::encoded_len,
                         &(#default),
                         #tag,
-                        &#ident,
+                        #map_value,
                         buf,
                     );
                 }
@@ -157,7 +158,7 @@ impl Field {
                         #ve,
                         #vl,
                         #tag,
-                        &#ident,
+                        #map_value,
                         buf,
                     );
                 }
@@ -169,7 +170,7 @@ impl Field {
                     #prost_path::encoding::message::encode,
                     #prost_path::encoding::message::encoded_len,
                     #tag,
-                    &#ident,
+                    #map_value,
                     buf,
                 );
             },
@@ -180,15 +181,33 @@ impl Field {
     /// into the map.
     pub fn merge(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         let key_mod = self.key_ty.module();
-        let km = quote!(#prost_path::encoding::#key_mod::merge);
         let module = self.map_ty.module();
+
+        // Keys are always scalars, so we need to wrap the merge function to ignore arena
+        let km = if self.key_ty.is_numeric() || matches!(self.key_ty, scalar::Ty::Bool) {
+            // Numeric and bool types don't use arena
+            let key_merge_fn = quote!(#prost_path::encoding::#key_mod::merge);
+            quote!(|wire_type, key, buf, _arena, ctx| #key_merge_fn(wire_type, key, buf, ctx))
+        } else {
+            // String keys use arena variant, then convert to owned String
+            quote!(|wire_type, key, buf, arena, ctx| {
+                let s = #prost_path::encoding::#key_mod::merge_arena(wire_type, buf, arena, ctx)?;
+                *key = s.to_string();
+                Ok(())
+            })
+        };
+
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
                 let default = quote!(#ty::default() as i32);
+                // Wrap int32::merge to ignore arena
+                let vm = quote!(|wire_type, val, buf, _arena, ctx| {
+                    #prost_path::encoding::int32::merge(wire_type, val, buf, ctx)
+                });
                 quote! {
                     #prost_path::encoding::#module::merge_with_default(
                         #km,
-                        #prost_path::encoding::int32::merge,
+                        #vm,
                         #default,
                         &mut #ident,
                         buf,
@@ -199,18 +218,41 @@ impl Field {
             }
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
-                let vm = quote!(#prost_path::encoding::#val_mod::merge);
+                // Wrap scalar merge functions to ignore arena
+                let vm = if value_ty.is_numeric() || matches!(value_ty, scalar::Ty::Bool) {
+                    let val_merge_fn = quote!(#prost_path::encoding::#val_mod::merge);
+                    quote!(|wire_type, val, buf, _arena, ctx| #val_merge_fn(wire_type, val, buf, ctx))
+                } else if matches!(value_ty, scalar::Ty::String) {
+                    // String values use arena variant
+                    quote!(|wire_type, val, buf, arena, ctx| {
+                        *val = #prost_path::encoding::#val_mod::merge_arena(wire_type, buf, arena, ctx)?;
+                        Ok(())
+                    })
+                } else {
+                    // Bytes
+                    quote!(|wire_type, val, buf, arena, ctx| {
+                        *val = #prost_path::encoding::#val_mod::merge_arena(wire_type, buf, arena, ctx)?;
+                        Ok(())
+                    })
+                };
                 quote!(#prost_path::encoding::#module::merge(#km, #vm, &mut #ident, buf, arena, ctx))
             }
-            ValueTy::Message => quote! {
-                #prost_path::encoding::#module::merge(
-                    #km,
-                    #prost_path::encoding::message::merge,
-                    &mut #ident,
-                    buf,
-                    arena,
-                    ctx,
-                )
+            ValueTy::Message => {
+                // Wrap message::merge in a closure to delay trait bound checking
+                // This allows circular dependencies (e.g., Struct -> Value -> Struct)
+                let vm = quote!(|wire_type, val, buf, arena, ctx| {
+                    #prost_path::encoding::message::merge(wire_type, val, buf, arena, ctx)
+                });
+                quote! {
+                    #prost_path::encoding::#module::merge(
+                        #km,
+                        #vm,
+                        &mut #ident,
+                        buf,
+                        arena,
+                        ctx,
+                    )
+                }
             },
         }
     }
@@ -221,6 +263,8 @@ impl Field {
         let key_mod = self.key_ty.module();
         let kl = quote!(#prost_path::encoding::#key_mod::encoded_len);
         let module = self.map_ty.module();
+        // For ArenaMap, extract the slice
+        let map_value = quote!(#ident.as_slice());
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
                 let default = quote!(#ty::default() as i32);
@@ -230,21 +274,21 @@ impl Field {
                         #prost_path::encoding::int32::encoded_len,
                         &(#default),
                         #tag,
-                        &#ident,
+                        #map_value,
                     )
                 }
             }
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
                 let vl = quote!(#prost_path::encoding::#val_mod::encoded_len);
-                quote!(#prost_path::encoding::#module::encoded_len(#kl, #vl, #tag, &#ident))
+                quote!(#prost_path::encoding::#module::encoded_len(#kl, #vl, #tag, #map_value))
             }
             ValueTy::Message => quote! {
                 #prost_path::encoding::#module::encoded_len(
                     #kl,
                     #prost_path::encoding::message::encoded_len,
                     #tag,
-                    &#ident,
+                    #map_value,
                 )
             },
         }
@@ -299,22 +343,18 @@ impl Field {
     /// The Debug tries to convert any enumerations met into the variants if possible, instead of
     /// outputting the raw numbers.
     pub fn debug(&self, prost_path: &Path, wrapper_name: TokenStream) -> TokenStream {
-        let type_name = match self.map_ty {
-            MapTy::HashMap => Ident::new("HashMap", Span::call_site()),
-            MapTy::BTreeMap => Ident::new("BTreeMap", Span::call_site()),
-        };
-
         // A fake field for generating the debug wrapper
         let key_wrapper = fake_scalar(self.key_ty.clone()).debug(prost_path, quote!(KeyWrapper));
         let key = self.key_ty.rust_type(prost_path);
         let value_wrapper = self.value_ty.debug(prost_path);
-        let libname = self.map_ty.lib();
+
+        // In arena mode, we use ArenaMap for all maps
         let fmt = quote! {
             fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 #key_wrapper
                 #value_wrapper
                 let mut builder = f.debug_map();
-                for (k, v) in self.0 {
+                for (k, v) in self.0.iter() {
                     builder.entry(&KeyWrapper(k), &ValueWrapper(v));
                 }
                 builder.finish()
@@ -335,14 +375,14 @@ impl Field {
 
                 let value = ty.rust_type(prost_path);
                 quote! {
-                    struct #wrapper_name<'a>(&'a ::#libname::collections::#type_name<#key, #value>);
+                    struct #wrapper_name<'a>(&'a #prost_path::ArenaMap<'a, #key, #value>);
                     impl<'a> ::core::fmt::Debug for #wrapper_name<'a> {
                         #fmt
                     }
                 }
             }
             ValueTy::Message => quote! {
-                struct #wrapper_name<'a, V: 'a>(&'a ::#libname::collections::#type_name<#key, V>);
+                struct #wrapper_name<'a, V: 'a>(&'a #prost_path::ArenaMap<'a, #key, V>);
                 impl<'a, V> ::core::fmt::Debug for #wrapper_name<'a, V>
                 where
                     V: ::core::fmt::Debug + 'a,
