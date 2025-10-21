@@ -11,7 +11,7 @@ use std::process::Command;
 use log::debug;
 use log::trace;
 
-use prost::Message;
+use prost::{Arena, Message};
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
 
 use crate::code_generator::CodeGenerator;
@@ -572,7 +572,8 @@ impl Config {
     ///
     /// ```rust,ignore
     /// let file_descriptor_set_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
-    /// let file_descriptor_set = prost_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..]).unwrap();
+    /// let arena = prost::Arena::new();
+    /// let file_descriptor_set = prost_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..], &arena).unwrap();
     /// ```
     pub fn file_descriptor_set_path<P>(&mut self, path: P) -> &mut Self
     where
@@ -999,7 +1000,8 @@ impl Config {
                 ),
             )
         })?;
-        let file_descriptor_set = FileDescriptorSet::decode(buf.as_slice()).map_err(|error| {
+        let arena = Arena::new();
+        let file_descriptor_set = FileDescriptorSet::decode(buf.as_slice(), &arena).map_err(|error| {
             Error::new(
                 ErrorKind::InvalidInput,
                 format!("invalid FileDescriptorSet: {error}"),

@@ -262,7 +262,7 @@ impl<'b> CodeGenerator<'_, 'b> {
         self.push_indent();
         self.buf.push_str("pub struct ");
         self.buf.push_str(&to_upper_camel(&message_name));
-        self.buf.push_str(" {\n");
+        self.buf.push_str("<'arena> {\n");
 
         self.depth += 1;
         self.path.push(2);
@@ -518,8 +518,8 @@ impl<'b> CodeGenerator<'_, 'b> {
         let prost_path = self.context.prost_path();
 
         if repeated {
-            self.buf
-                .push_str(&format!("{prost_path}::alloc::vec::Vec<"));
+            // All repeated fields are arena-allocated slices
+            self.buf.push_str("&'arena [");
         } else if optional {
             self.buf.push_str("::core::option::Option<");
         }
@@ -531,8 +531,10 @@ impl<'b> CodeGenerator<'_, 'b> {
         if boxed {
             self.buf.push('>');
         }
-        if repeated || optional {
-            self.buf.push('>');
+        if repeated {
+            self.buf.push(']');  // Close slice
+        } else if optional {
+            self.buf.push('>');  // Close Option
         }
         self.buf.push_str(",\n");
     }
@@ -987,7 +989,7 @@ impl<'b> CodeGenerator<'_, 'b> {
                 .bytes_type(fq_message_name, field.name())
                 .rust_type()
                 .to_owned(),
-            Type::Group | Type::Message => self.resolve_ident(field.type_name()),
+            Type::Group | Type::Message => format!("{}<'arena>", self.resolve_ident(field.type_name())),
         }
     }
 
