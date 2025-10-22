@@ -966,9 +966,29 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         quote! {
             impl #impl_generics #prost_path::Message<'arena> for #ident #ty_generics #where_clause {
                 fn new_in(_arena: &'arena #prost_path::Arena) -> Self {
-                    // Views should not be constructed via new_in()
-                    // Use the builder's into_view() instead
-                    unreachable!("Cannot create view directly - use builder")
+                    // Views should not be constructed directly via new_in()
+                    // Use Self::builder() or Self::decode() instead
+                    unreachable!("Use <Self as MessageView>::Builder::new_in() instead")
+                }
+
+                // Override decode to use builder transparently
+                fn decode(buf: impl #prost_path::bytes::Buf, arena: &'arena #prost_path::Arena) -> ::core::result::Result<Self, #prost_path::DecodeError> {
+                    let mut builder = <Self as #prost_path::MessageView<'arena>>::Builder::new_in(arena);
+                    builder.merge(buf)?;
+                    Ok(builder.into_view())
+                }
+
+                // Override decode_length_delimited to use builder transparently
+                fn decode_length_delimited(mut buf: impl #prost_path::bytes::Buf, arena: &'arena #prost_path::Arena) -> ::core::result::Result<Self, #prost_path::DecodeError> {
+                    let mut builder = <Self as #prost_path::MessageView<'arena>>::Builder::new_in(arena);
+                    let length = #prost_path::encoding::decode_varint(&mut buf)?;
+                    if length > buf.remaining() as u64 {
+                        return Err(#prost_path::DecodeError::new("buffer underflow"));
+                    }
+                    let limit = (buf.remaining() - length as usize) as u64;
+                    let mut limited_buf = buf.take(length as usize);
+                    builder.merge(&mut limited_buf)?;
+                    Ok(builder.into_view())
                 }
 
                 #[allow(unused_variables)]
@@ -999,7 +1019,13 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
 
             impl #impl_generics #ident #ty_generics #where_clause {
+                /// Creates a new builder for constructing this message
+                pub fn builder(arena: &'arena #prost_path::Arena) -> <Self as #prost_path::MessageView<'arena>>::Builder {
+                    <Self as #prost_path::MessageView<'arena>>::Builder::new_in(arena)
+                }
+
                 pub fn encode(&self, buf: &mut impl #prost_path::bytes::BufMut) -> ::core::result::Result<(), #prost_path::EncodeError> {
+                    use #prost_path::Message as _;
                     let required = self.encoded_len();
                     let remaining = buf.remaining_mut();
                     if required > remaining {
@@ -1014,6 +1040,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         quote! {
             impl #impl_generics #ident #ty_generics #where_clause {
                 pub fn encode(&self, buf: &mut impl #prost_path::bytes::BufMut) -> ::core::result::Result<(), #prost_path::EncodeError> {
+                    use #prost_path::Message as _;
                     let required = self.encoded_len();
                     let remaining = buf.remaining_mut();
                     if required > remaining {
