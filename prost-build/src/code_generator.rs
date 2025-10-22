@@ -943,7 +943,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             .method
             .into_iter()
             .enumerate()
-            .map(|(idx, mut method)| {
+            .map(|(idx, method)| {
                 debug!("  method: {:?}", method.name());
 
                 self.path.push(idx as i32);

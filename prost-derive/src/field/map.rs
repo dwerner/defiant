@@ -30,6 +30,7 @@ impl MapTy {
         Ident::new("arena_map", Span::call_site())
     }
 
+    #[allow(dead_code)]
     fn lib(&self) -> TokenStream {
         match self {
             MapTy::HashMap => quote! { std },

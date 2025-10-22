@@ -523,6 +523,7 @@ fixed_width!(
 );
 
 /// Macro which emits encoding functions for a length-delimited type.
+#[allow(unused_macros)]
 macro_rules! length_delimited {
     ($ty:ty) => {
         encode_repeated!($ty);
@@ -1421,7 +1422,6 @@ pub mod btree_map {
 pub mod arena_map {
     use crate::arena::BumpVec;
     use crate::encoding::*;
-    use core::hash::Hash;
 
     /// Generic protobuf map merge function for arena-allocated maps.
     ///

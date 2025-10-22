@@ -1,18 +1,16 @@
-use std::cell::RefCell;
 use std::collections::HashMap;
-use std::default;
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::fs::{self, File};
-use std::io::{Error, ErrorKind, Read, Result, Write};
+use std::fs;
+use std::io::{Error, ErrorKind, Result, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use log::debug;
 use log::trace;
 
-use prost::{Arena, Message};
+use prost::Message;
 use prost_types::{FileDescriptorProto, FileDescriptorSet};
 
 use crate::code_generator::CodeGenerator;
