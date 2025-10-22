@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use prost::Message;
+use prost::{Arena, Message};
 use std::error::Error;
 
 pub mod benchmarks {
@@ -29,71 +29,63 @@ pub mod benchmarks {
 
 use crate::benchmarks::BenchmarkDataset;
 
-fn load_dataset(dataset: &[u8]) -> Result<BenchmarkDataset, Box<dyn Error>> {
-    Ok(BenchmarkDataset::decode(dataset)?)
-}
-
-fn benchmark_dataset<M>(criterion: &mut Criterion, name: &str, dataset: &'static [u8])
-where
-    M: prost::Message + Default + 'static,
-{
-    let mut group = criterion.benchmark_group(&format!("dataset/{}", name));
-
-    group.bench_function("merge", move |b| {
-        let dataset = load_dataset(dataset).unwrap();
-        let mut message = M::default();
-        b.iter(|| {
-            for buf in &dataset.payload {
-                message.clear();
-                message.merge(buf.as_slice()).unwrap();
-                criterion::black_box(&message);
-            }
-        });
-    });
-
-    group.bench_function("encode", move |b| {
-        let messages = load_dataset(dataset)
-            .unwrap()
-            .payload
-            .iter()
-            .map(Vec::as_slice)
-            .map(M::decode)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        let mut buf = Vec::with_capacity(messages.iter().map(M::encoded_len).sum::<usize>());
-        b.iter(|| {
-            buf.clear();
-            for message in &messages {
-                message.encode(&mut buf).unwrap();
-            }
-            criterion::black_box(&buf);
-        });
-    });
-
-    group.bench_function("encoded_len", move |b| {
-        let messages = load_dataset(dataset)
-            .unwrap()
-            .payload
-            .iter()
-            .map(Vec::as_slice)
-            .map(M::decode)
-            .collect::<Result<Vec<_>, _>>()
-            .unwrap();
-        b.iter(|| {
-            let encoded_len = messages.iter().map(M::encoded_len).sum::<usize>();
-            criterion::black_box(encoded_len)
-        });
-    });
+fn load_dataset<'arena>(dataset: &[u8], arena: &'arena Arena) -> Result<BenchmarkDataset<'arena>, Box<dyn Error>> {
+    Ok(BenchmarkDataset::decode(dataset, arena)?)
 }
 
 macro_rules! dataset {
     ($name: ident, $ty: ty) => {
         fn $name(criterion: &mut Criterion) {
-            benchmark_dataset::<$ty>(
-                criterion,
-                stringify!($name),
-                crate::benchmarks::dataset::$name(),
-            );
+            let dataset_bytes = crate::benchmarks::dataset::$name();
+            let mut group = criterion.benchmark_group(&format!("dataset/{}", stringify!($name)));
+
+            group.bench_function("decode", move |b| {
+                let load_arena = Arena::new();
+                let dataset = load_dataset(dataset_bytes, &load_arena).unwrap();
+                b.iter(|| {
+                    for buf in dataset.payload {
+                        let arena = Arena::new();
+                        let message = <$ty>::decode(*buf, &arena).unwrap();
+                        std::hint::black_box(&message);
+                    }
+                });
+            });
+
+            group.bench_function("encode", move |b| {
+                // Create arena and decode all messages once
+                let arena = Arena::new();
+                let load_arena = Arena::new();
+                let dataset = load_dataset(dataset_bytes, &load_arena).unwrap();
+                let messages: Vec<_> = dataset
+                    .payload
+                    .iter()
+                    .map(|buf| <$ty>::decode(*buf, &arena).unwrap())
+                    .collect();
+                let mut buf = Vec::with_capacity(messages.iter().map(|m| m.encoded_len()).sum::<usize>());
+                b.iter(|| {
+                    buf.clear();
+                    for message in &messages {
+                        message.encode(&mut buf).unwrap();
+                    }
+                    std::hint::black_box(&buf);
+                });
+            });
+
+            group.bench_function("encoded_len", move |b| {
+                // Create arena and decode all messages once
+                let arena = Arena::new();
+                let load_arena = Arena::new();
+                let dataset = load_dataset(dataset_bytes, &load_arena).unwrap();
+                let messages: Vec<_> = dataset
+                    .payload
+                    .iter()
+                    .map(|buf| <$ty>::decode(*buf, &arena).unwrap())
+                    .collect();
+                b.iter(|| {
+                    let encoded_len = messages.iter().map(|m| m.encoded_len()).sum::<usize>();
+                    std::hint::black_box(encoded_len)
+                });
+            });
         }
     };
 }

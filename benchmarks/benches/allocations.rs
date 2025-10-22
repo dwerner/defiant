@@ -30,50 +30,81 @@ pub mod benchmarks {
 
 use crate::benchmarks::BenchmarkDataset;
 
-fn load_dataset(dataset: &[u8]) -> BenchmarkDataset {
-    BenchmarkDataset::decode(dataset).unwrap()
-}
-
-fn profile_allocations<M>(name: &str, dataset: &'static [u8])
-where
-    M: prost::Message + Default,
-{
-    let dataset = load_dataset(dataset);
-
-    println!("\n=== Allocation Profile: {} ===", name);
-    println!("Number of messages in dataset: {}", dataset.payload.len());
-
-    let _profiler = dhat::Profiler::new_heap();
-
-    // Decode all messages to count allocations
-    let mut total_bytes = 0;
-    for buf in &dataset.payload {
-        let message = M::decode(buf.as_slice()).unwrap();
-        total_bytes += buf.len();
-        drop(message);
-    }
-
-    println!("Total bytes decoded: {}", total_bytes);
-    println!("Stats saved to dhat-heap.json");
-    println!("View with: https://nnethercote.github.io/dh_view/dh_view.html");
-}
-
 fn main() {
     // Profile google_message1_proto2 (simple message)
-    profile_allocations::<benchmarks::proto2::GoogleMessage1>(
-        "google_message1_proto2",
-        benchmarks::dataset::google_message1_proto2(),
-    );
+    {
+        let arena = prost::Arena::new();
+        let dataset_bytes = benchmarks::dataset::google_message1_proto2();
+        let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
+
+        println!("\n=== Allocation Profile: google_message1_proto2 ===");
+        println!("Number of messages in dataset: {}", dataset.payload.len());
+
+        let _profiler = dhat::Profiler::new_heap();
+
+        let mut total_bytes = 0;
+        for buf in dataset.payload {
+            let message = benchmarks::proto2::GoogleMessage1::decode(*buf, &arena).unwrap();
+            total_bytes += buf.len();
+            drop(message);
+        }
+
+        println!("Total bytes decoded: {}", total_bytes);
+        println!("Stats saved to dhat-heap.json");
+    }
 
     // Profile google_message1_proto3 (simple message, proto3)
-    profile_allocations::<benchmarks::proto3::GoogleMessage1>(
-        "google_message1_proto3",
-        benchmarks::dataset::google_message1_proto3(),
-    );
+    {
+        let arena = prost::Arena::new();
+        let dataset_bytes = benchmarks::dataset::google_message1_proto3();
+        let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
 
-    // Profile google_message2 (complex nested message - this will show the most allocations)
-    profile_allocations::<benchmarks::proto2::GoogleMessage2>(
-        "google_message2",
-        benchmarks::dataset::google_message2(),
-    );
+        println!("\n=== Allocation Profile: google_message1_proto3 ===");
+        println!("Number of messages in dataset: {}", dataset.payload.len());
+
+        let _profiler = dhat::Profiler::new_heap();
+
+        let mut total_bytes = 0;
+        for buf in dataset.payload {
+            let message = benchmarks::proto3::GoogleMessage1::decode(*buf, &arena).unwrap();
+            total_bytes += buf.len();
+            drop(message);
+        }
+
+        println!("Total bytes decoded: {}", total_bytes);
+        println!("Stats saved to dhat-heap.json");
+    }
+
+    // Profile google_message2 (complex nested message)
+    {
+        let arena = prost::Arena::new();
+        let dataset_bytes = benchmarks::dataset::google_message2();
+        let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
+
+        println!("\n=== Allocation Profile: google_message2 ===");
+        println!("Number of messages in dataset: {}", dataset.payload.len());
+
+        let _profiler = dhat::Profiler::new_heap();
+
+        let mut total_bytes = 0;
+        let mut successful = 0;
+        let mut failed = 0;
+        for buf in dataset.payload {
+            match benchmarks::proto2::GoogleMessage2::decode(*buf, &arena) {
+                Ok(message) => {
+                    total_bytes += buf.len();
+                    successful += 1;
+                    drop(message);
+                }
+                Err(e) => {
+                    eprintln!("Failed to decode message: {}", e);
+                    failed += 1;
+                }
+            }
+        }
+
+        println!("Total bytes decoded: {}", total_bytes);
+        println!("Successful: {}, Failed: {}", successful, failed);
+        println!("Stats saved to dhat-heap.json");
+    }
 }
