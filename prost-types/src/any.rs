@@ -14,7 +14,7 @@ impl<'arena> Any<'arena> {
         Message::encode(msg, &mut value_vec)?;
         let value = arena.alloc_slice_copy(&value_vec);
 
-        Ok(Any { type_url, value, _phantom: ::core::marker::PhantomData })
+        Ok(Any { type_url, value })
     }
 
     /// Decode the given message type `M` from [`Any`], validating that it has

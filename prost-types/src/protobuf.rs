@@ -1252,8 +1252,6 @@ pub struct Any<'arena> {
     /// Must be a valid serialized protocol buffer of the above specified type.
     #[prost(bytes = "vec", tag = "2")]
     pub value: &'arena [u8],
-    #[prost(skip)]
-    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// `SourceContext` represents information about the source of a
 /// protobuf element, like the file in which it is defined.
@@ -1264,8 +1262,6 @@ pub struct SourceContext<'arena> {
     /// protobuf element.  For example: `"google/protobuf/source_context.proto"`.
     #[prost(string, tag = "1")]
     pub file_name: &'arena str,
-    #[prost(skip)]
-    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// A protocol buffer message type.
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
@@ -2047,8 +2043,6 @@ pub struct FieldMask<'arena> {
     /// The set of field mask paths.
     #[prost(string, repeated, tag = "1")]
     pub paths: &'arena [&'arena str],
-    #[prost(skip)]
-    pub _phantom: ::core::marker::PhantomData<&'arena ()>,
 }
 /// `Struct` represents a structured data value, consisting of fields
 /// which map to dynamically typed values. In some languages, `Struct`

@@ -49,7 +49,10 @@ impl Timestamp {
     /// Normalization is based on [`google::protobuf::util::CreateNormalized`][1].
     ///
     /// [1]: https://github.com/google/protobuf/blob/v3.3.2/src/google/protobuf/util/time_util.cc#L59-L77
-    pub fn try_normalize<'arena>(mut self) -> Result<Timestamp, Timestamp> where Self: 'arena {
+    pub fn try_normalize<'arena>(mut self) -> Result<Timestamp, Timestamp>
+    where
+        Self: 'arena,
+    {
         let before = self;
         self.normalize();
         // If the seconds value has changed, and is either i64::MIN or i64::MAX, then the timestamp
@@ -285,7 +288,6 @@ mod tests {
             Timestamp {
                 seconds: -1_001,
                 nanos: 0,
-                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
@@ -293,7 +295,6 @@ mod tests {
             Timestamp {
                 seconds: -1,
                 nanos: 100,
-                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
@@ -301,7 +302,6 @@ mod tests {
             Timestamp {
                 seconds: -2_001_235,
                 nanos: 999_987_700,
-                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
@@ -309,7 +309,6 @@ mod tests {
             Timestamp {
                 seconds: -769,
                 nanos: 934_567_900,
-                _phantom: ::core::marker::PhantomData
             }
         );
     }
@@ -323,7 +322,6 @@ mod tests {
             Timestamp {
                 seconds: -1,
                 nanos: 1,
-                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
@@ -331,7 +329,6 @@ mod tests {
             Timestamp {
                 seconds: -1_234_568,
                 nanos: 999_999_877,
-                _phantom: ::core::marker::PhantomData
             }
         );
         assert_eq!(
@@ -339,7 +336,6 @@ mod tests {
             Timestamp {
                 seconds: -891,
                 nanos: 12_345_679,
-                _phantom: ::core::marker::PhantomData
             }
         );
     }
@@ -406,7 +402,6 @@ mod tests {
             let test_timestamp = crate::Timestamp {
                 seconds: case.1,
                 nanos: case.2,
-                _phantom: ::core::marker::PhantomData,
             };
 
             assert_eq!(
@@ -414,7 +409,6 @@ mod tests {
                 crate::Timestamp {
                     seconds: case.3,
                     nanos: case.4,
-                    _phantom: ::core::marker::PhantomData,
                 },
                 "test case on line {} doesn't match",
                 case.0,
