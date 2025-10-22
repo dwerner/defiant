@@ -14,6 +14,9 @@ pub enum MapTy {
 
 impl MapTy {
     fn from_str(s: &str) -> Option<MapTy> {
+        // TODO: Rename these attributes to "arena_map" to reflect that all maps use
+        // arena allocation now. Current syntax like `prost(btree_map = "string, message")`
+        // should become `prost(arena_map = "string, message")` for clarity.
         match s {
             "map" | "hash_map" => Some(MapTy::HashMap),
             "btree_map" => Some(MapTy::BTreeMap),
@@ -53,6 +56,29 @@ pub struct Field {
 }
 
 impl Field {
+    /// Returns the default value for a map key type
+    fn key_default(&self) -> TokenStream {
+        use scalar::Ty::*;
+        match &self.key_ty {
+            String => quote!(""),
+            Bool => quote!(false),
+            Int32 | Sint32 | Sfixed32 => quote!(0i32),
+            Int64 | Sint64 | Sfixed64 => quote!(0i64),
+            Uint32 | Fixed32 => quote!(0u32),
+            Uint64 | Fixed64 => quote!(0u64),
+            _ => quote!(Default::default()),
+        }
+    }
+
+    /// Returns the arena-allocated key type for maps
+    fn arena_key_type(&self) -> TokenStream {
+        use scalar::Ty::*;
+        match &self.key_ty {
+            String => quote!(&'a str),
+            _ => self.key_ty.rust_ref_type(),
+        }
+    }
+
     pub fn new(attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Option<Field>, Error> {
         let mut types = None;
         let mut tag = None;
@@ -126,21 +152,30 @@ impl Field {
     pub fn encode(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let key_mod = self.key_ty.module();
-        let ke = quote!(#prost_path::encoding::#key_mod::encode);
-        let kl = quote!(#prost_path::encoding::#key_mod::encoded_len);
+        // Use _ref variants for string keys since they're &'arena str, not String
+        // Wrap in closures to match the expected signature: &K -> &&str for _ref functions
+        let (ke, kl) = if matches!(self.key_ty, scalar::Ty::String) {
+            (quote!(|tag, key: &&str, buf| #prost_path::encoding::#key_mod::encode_ref(tag, *key, buf)),
+             quote!(|tag, key: &&str| #prost_path::encoding::#key_mod::encoded_len_ref(tag, *key)))
+        } else {
+            (quote!(#prost_path::encoding::#key_mod::encode),
+             quote!(#prost_path::encoding::#key_mod::encoded_len))
+        };
+        let key_default = self.key_default();
         let module = self.map_ty.module();
         // For ArenaMap, extract the slice
         let map_value = quote!(#ident.as_slice());
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
-                let default = quote!(#ty::default() as i32);
+                let val_default = quote!(#ty::default() as i32);
                 quote! {
-                    #prost_path::encoding::#module::encode_with_default(
+                    #prost_path::encoding::#module::encode_with_defaults(
                         #ke,
                         #kl,
                         #prost_path::encoding::int32::encode,
                         #prost_path::encoding::int32::encoded_len,
-                        &(#default),
+                        &#key_default,
+                        &(#val_default),
                         #tag,
                         #map_value,
                         buf,
@@ -151,28 +186,40 @@ impl Field {
                 let val_mod = value_ty.module();
                 let ve = quote!(#prost_path::encoding::#val_mod::encode);
                 let vl = quote!(#prost_path::encoding::#val_mod::encoded_len);
+                let val_default = value_ty.rust_ref_type();
                 quote! {
-                    #prost_path::encoding::#module::encode(
+                    #prost_path::encoding::#module::encode_with_defaults(
                         #ke,
                         #kl,
                         #ve,
                         #vl,
+                        &#key_default,
+                        &#val_default::default(),
                         #tag,
                         #map_value,
                         buf,
                     );
                 }
             }
-            ValueTy::Message => quote! {
-                #prost_path::encoding::#module::encode(
-                    #ke,
-                    #kl,
-                    #prost_path::encoding::message::encode,
-                    #prost_path::encoding::message::encoded_len,
-                    #tag,
-                    #map_value,
-                    buf,
-                );
+            ValueTy::Message => {
+                // For messages, create a temporary default for comparison
+                // (though in practice, message map values are rarely equal to default)
+                quote! {
+                    {
+                        let val_default = ::core::default::Default::default();
+                        #prost_path::encoding::#module::encode_with_defaults(
+                            #ke,
+                            #kl,
+                            #prost_path::encoding::message::encode,
+                            #prost_path::encoding::message::encoded_len,
+                            &#key_default,
+                            &val_default,
+                            #tag,
+                            #map_value,
+                            buf,
+                        );
+                    }
+                }
             },
         }
     }
@@ -189,10 +236,9 @@ impl Field {
             let key_merge_fn = quote!(#prost_path::encoding::#key_mod::merge);
             quote!(|wire_type, key, buf, _arena, ctx| #key_merge_fn(wire_type, key, buf, ctx))
         } else {
-            // String keys use arena variant, then convert to owned String
+            // String keys use arena variant directly
             quote!(|wire_type, key, buf, arena, ctx| {
-                let s = #prost_path::encoding::#key_mod::merge_arena(wire_type, buf, arena, ctx)?;
-                *key = s.to_string();
+                *key = #prost_path::encoding::#key_mod::merge_arena(wire_type, buf, arena, ctx)?;
                 Ok(())
             })
         };
@@ -261,18 +307,26 @@ impl Field {
     pub fn encoded_len(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         let tag = self.tag;
         let key_mod = self.key_ty.module();
-        let kl = quote!(#prost_path::encoding::#key_mod::encoded_len);
+        // Use _ref variant for string keys since they're &'arena str, not String
+        // Wrap in closure to match the expected signature: &K -> &&str for _ref function
+        let kl = if matches!(self.key_ty, scalar::Ty::String) {
+            quote!(|tag, key: &&str| #prost_path::encoding::#key_mod::encoded_len_ref(tag, *key))
+        } else {
+            quote!(#prost_path::encoding::#key_mod::encoded_len)
+        };
+        let key_default = self.key_default();
         let module = self.map_ty.module();
         // For ArenaMap, extract the slice
         let map_value = quote!(#ident.as_slice());
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
-                let default = quote!(#ty::default() as i32);
+                let val_default = quote!(#ty::default() as i32);
                 quote! {
-                    #prost_path::encoding::#module::encoded_len_with_default(
+                    #prost_path::encoding::#module::encoded_len_with_defaults(
                         #kl,
                         #prost_path::encoding::int32::encoded_len,
-                        &(#default),
+                        &#key_default,
+                        &(#val_default),
                         #tag,
                         #map_value,
                     )
@@ -281,15 +335,30 @@ impl Field {
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
                 let vl = quote!(#prost_path::encoding::#val_mod::encoded_len);
-                quote!(#prost_path::encoding::#module::encoded_len(#kl, #vl, #tag, #map_value))
+                let val_default = value_ty.rust_ref_type();
+                quote! {
+                    #prost_path::encoding::#module::encoded_len_with_defaults(
+                        #kl,
+                        #vl,
+                        &#key_default,
+                        &#val_default::default(),
+                        #tag,
+                        #map_value,
+                    )
+                }
             }
             ValueTy::Message => quote! {
-                #prost_path::encoding::#module::encoded_len(
-                    #kl,
-                    #prost_path::encoding::message::encoded_len,
-                    #tag,
-                    #map_value,
-                )
+                {
+                    let val_default = ::core::default::Default::default();
+                    #prost_path::encoding::#module::encoded_len_with_defaults(
+                        #kl,
+                        #prost_path::encoding::message::encoded_len,
+                        &#key_default,
+                        &val_default,
+                        #tag,
+                        #map_value,
+                    )
+                }
             },
         }
     }
@@ -345,7 +414,7 @@ impl Field {
     pub fn debug(&self, prost_path: &Path, wrapper_name: TokenStream) -> TokenStream {
         // A fake field for generating the debug wrapper
         let key_wrapper = fake_scalar(self.key_ty.clone()).debug(prost_path, quote!(KeyWrapper));
-        let key = self.key_ty.rust_type(prost_path);
+        let key = self.arena_key_type();
         let value_wrapper = self.value_ty.debug(prost_path);
 
         // In arena mode, we use ArenaMap for all maps

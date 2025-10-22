@@ -61,8 +61,8 @@ impl<'arena> prost::ArenaFrom<'arena, Vec<Value<'arena>>> for Value<'arena> {
 
 impl<'arena> prost::ArenaFrom<'arena, BTreeMap<String, Value<'arena>>> for Value<'arena> {
     fn arena_from(map: BTreeMap<String, Value<'arena>>, arena: &'arena prost::Arena) -> Self {
-        // Convert BTreeMap to iterator of tuples, then allocate as slice
-        let entries = map.into_iter();
+        // Convert BTreeMap to iterator, allocating String keys into arena as &str
+        let entries = map.into_iter().map(|(k, v)| (arena.alloc_str(&k), v));
         let fields_slice = arena.alloc_slice_fill_iter(entries);
         let struct_value = arena.alloc(crate::protobuf::Struct {
             fields: prost::ArenaMap::new(fields_slice)

@@ -2063,7 +2063,7 @@ pub struct FieldMask<'arena> {
 pub struct Struct<'arena> {
     /// Unordered map of dynamically typed values.
     #[prost(btree_map = "string, message", tag = "1")]
-    pub fields: ::prost::ArenaMap<'arena, ::prost::alloc::string::String, Value<'arena>>,
+    pub fields: ::prost::ArenaMap<'arena, &'arena str, Value<'arena>>,
 }
 /// `Value` represents a dynamically typed value which can be either
 /// null, a number, a string, a boolean, a recursive struct value, or a

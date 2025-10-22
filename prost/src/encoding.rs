@@ -1504,11 +1504,12 @@ pub mod arena_map {
         VE: Fn(u32, &V, &mut B),
         VL: Fn(u32, &V) -> usize,
     {
-        encode_with_default(
+        encode_with_defaults(
             key_encode,
             key_encoded_len,
             val_encode,
             val_encoded_len,
+            &K::default(),
             &V::default(),
             tag,
             values,
@@ -1516,18 +1517,19 @@ pub mod arena_map {
         )
     }
 
-    /// Generic protobuf map encode function with an overridden value default.
-    pub fn encode_with_default<K, V, B, KE, KL, VE, VL>(
+    /// Generic protobuf map encode function with overridden key and value defaults.
+    pub fn encode_with_defaults<K, V, B, KE, KL, VE, VL>(
         key_encode: KE,
         key_encoded_len: KL,
         val_encode: VE,
         val_encoded_len: VL,
+        key_default: &K,
         val_default: &V,
         tag: u32,
         values: &[(K, V)],
         buf: &mut B,
     ) where
-        K: Default + PartialEq,
+        K: PartialEq,
         V: PartialEq,
         B: BufMut,
         KE: Fn(u32, &K, &mut B),
@@ -1536,7 +1538,7 @@ pub mod arena_map {
         VL: Fn(u32, &V) -> usize,
     {
         for (key, val) in values.iter() {
-            let skip_key = key == &K::default();
+            let skip_key = key == key_default;
             let skip_val = val == val_default;
 
             let len = (if skip_key { 0 } else { key_encoded_len(1, key) })
@@ -1566,19 +1568,20 @@ pub mod arena_map {
         KL: Fn(u32, &K) -> usize,
         VL: Fn(u32, &V) -> usize,
     {
-        encoded_len_with_default(key_encoded_len, val_encoded_len, &V::default(), tag, values)
+        encoded_len_with_defaults(key_encoded_len, val_encoded_len, &K::default(), &V::default(), tag, values)
     }
 
-    /// Generic protobuf map encoded length function with an overridden value default.
-    pub fn encoded_len_with_default<K, V, KL, VL>(
+    /// Generic protobuf map encoded length function with overridden key and value defaults.
+    pub fn encoded_len_with_defaults<K, V, KL, VL>(
         key_encoded_len: KL,
         val_encoded_len: VL,
+        key_default: &K,
         val_default: &V,
         tag: u32,
         values: &[(K, V)],
     ) -> usize
     where
-        K: Default + PartialEq,
+        K: PartialEq,
         V: PartialEq,
         KL: Fn(u32, &K) -> usize,
         VL: Fn(u32, &V) -> usize,
@@ -1587,7 +1590,7 @@ pub mod arena_map {
             + values
                 .iter()
                 .map(|(key, val)| {
-                    let len = (if key == &K::default() {
+                    let len = (if key == key_default {
                         0
                     } else {
                         key_encoded_len(1, key)
