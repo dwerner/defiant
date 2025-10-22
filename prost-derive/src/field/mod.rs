@@ -194,6 +194,7 @@ impl Field {
             Field::Scalar(ref scalar) => scalar.is_repeated(),
             Field::Map(_) => true,  // Maps are encoded as repeated
             Field::Message(ref message) => message.label == Label::Repeated,
+            Field::Group(ref group) => group.label == Label::Repeated,
             _ => false,
         }
     }

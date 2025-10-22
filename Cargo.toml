@@ -15,7 +15,7 @@ members = [
   "tests/prost-path",
   "tests/reexported-prost",
   "tests/single-include",
-  "fuzz",
+  "fuzz", "regenerate-types",
 ]
 
 resolver = "2"

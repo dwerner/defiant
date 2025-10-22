@@ -181,14 +181,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         Data::Union(..) => bail!("Message can not be derived for a union"),
     };
 
-    // Check if the struct has a _phantom field
-    let has_phantom_field = match &variant_data.fields {
-        Fields::Named(fields) => fields.named.iter().any(|f| {
-            f.ident.as_ref().map(|id| id == "_phantom").unwrap_or(false)
-        }),
-        _ => false,
-    };
-
     // Check if the struct actually uses arena allocation by examining field types
     let needs_arena = match &variant_data.fields {
         Fields::Named(fields) => fields.named.iter().any(|f| type_uses_arena(&f.ty)),
@@ -305,6 +297,27 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                         field.encoded_len(&prost_path, quote!(self.#field_ident))
                     }
                 },
+                // For repeated groups/messages in views, use encoded_len functions that work with slices
+                Field::Group(_) if field.is_repeated() => {
+                    let tag = match field {
+                        Field::Group(g) => g.tag,
+                        _ => unreachable!(),
+                    };
+                    quote! {
+                        #prost_path::encoding::group::encoded_len_repeated(#tag, self.#field_ident)
+                    }
+                },
+                Field::Message(_) if field.is_repeated() => {
+                    quote! {
+                        {
+                            use #prost_path::Message as _;
+                            self.#field_ident.iter().map(|msg| {
+                                let len = msg.encoded_len();
+                                #prost_path::encoding::encoded_len_varint(len as u64) + len
+                            }).sum::<usize>()
+                        }
+                    }
+                },
                 _ => field.encoded_len(&prost_path, quote!(self.#field_ident)),
             }
         })
@@ -333,6 +346,35 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                         field.encode(&prost_path, quote!(self.#field_ident))
                     }
                 },
+                // For repeated groups in views, iterate the slice directly
+                Field::Group(_) if field.is_repeated() => {
+                    let tag = match field {
+                        Field::Group(g) => g.tag,
+                        _ => unreachable!(),
+                    };
+                    quote! {
+                        for msg in self.#field_ident {
+                            #prost_path::encoding::group::encode(#tag, msg, buf);
+                        }
+                    }
+                },
+                // For repeated messages in views, iterate and encode each
+                Field::Message(_) if field.is_repeated() => {
+                    let tag = match field {
+                        Field::Message(m) => m.tag,
+                        _ => unreachable!(),
+                    };
+                    quote! {
+                        {
+                            use #prost_path::Message as _;
+                            for msg in self.#field_ident {
+                                #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
+                                #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
+                                msg.encode_raw(buf);
+                            }
+                        }
+                    }
+                },
                 _ => field.encode(&prost_path, quote!(self.#field_ident)),
             }
         })
@@ -340,12 +382,122 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
     let merge = fields_with_types.iter().map(|(field_ident, field_type, field)| {
         use crate::field::Field;
+        use crate::field::Label;
 
         let tags = field.tags().into_iter().map(|tag| quote!(#tag));
         let tags = Itertools::intersperse(tags, quote!(|));
 
-        // Special handling for message fields
-        if let Field::Message(ref msg_field) = field {
+        // Check if this is a repeated message or group (needs special inline handling)
+        let is_repeated_message_or_group = match field {
+            Field::Message(ref msg_field) => msg_field.label == Label::Repeated,
+            Field::Group(ref group_field) => group_field.label == Label::Repeated,
+            _ => false,
+        };
+
+        if (matches!(field, Field::Message(_) | Field::Group(_))) && !is_repeated_message_or_group {
+            // Non-repeated messages and groups: use builder pattern
+            // Extract the type path and build the Message companion path
+            let mut base_path = extract_type_path(field_type);
+            // Append "Message" to the last segment
+            if let Some(last_seg) = base_path.segments.last_mut() {
+                let type_name = last_seg.ident.to_string();
+                last_seg.ident = Ident::new(&format!("{}Message", type_name), Span::call_site());
+            }
+            let builder_type_name = base_path;
+
+            let label = match field {
+                Field::Message(msg_field) => msg_field.label,
+                Field::Group(group_field) => group_field.label,
+                _ => unreachable!(),
+            };
+
+            // Groups use StartGroup wire type, messages use LengthDelimited
+            let expected_wire_type = if matches!(field, Field::Group(_)) {
+                quote!(#prost_path::encoding::WireType::StartGroup)
+            } else {
+                quote!(#prost_path::encoding::WireType::LengthDelimited)
+            };
+
+            // For groups, use group::merge; for messages, use merge_loop
+            let merge_fn = if matches!(field, Field::Group(_)) {
+                quote! {
+                    #prost_path::encoding::group::merge(
+                        tag,
+                        wire_type,
+                        &mut builder,
+                        buf,
+                        arena,
+                        ctx.enter_recursion()
+                    )
+                }
+            } else {
+                quote! {
+                    #prost_path::encoding::merge_loop(
+                        &mut builder,
+                        buf,
+                        ctx.enter_recursion(),
+                        |builder, buf, ctx| {
+                            let (tag, wire_type) = #prost_path::encoding::decode_key(buf)?;
+                            builder.merge_field(tag, wire_type, buf, ctx)
+                        }
+                    )
+                }
+            };
+
+            let merge_code = match label {
+                Label::Optional => quote! {
+                    #prost_path::encoding::check_wire_type(#expected_wire_type, wire_type)
+                        .map_err(|mut error| {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error
+                        })?;
+                    ctx.limit_reached()
+                        .map_err(|mut error| {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error
+                        })?;
+                    let mut builder = #builder_type_name::new_in(arena);
+                    #merge_fn.map_err(|mut error| {
+                        error.push(STRUCT_NAME, stringify!(#field_ident));
+                        error
+                    })?;
+                    let view = builder.into_view();
+                    self.#field_ident = Some(&*arena.alloc(view));
+                    Ok(())
+                },
+                Label::Required => quote! {
+                    #prost_path::encoding::check_wire_type(#expected_wire_type, wire_type)
+                        .map_err(|mut error| {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error
+                        })?;
+                    ctx.limit_reached()
+                        .map_err(|mut error| {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error
+                        })?;
+                    let mut builder = #builder_type_name::new_in(arena);
+                    #merge_fn.map_err(|mut error| {
+                        error.push(STRUCT_NAME, stringify!(#field_ident));
+                        error
+                    })?;
+                    let view = builder.into_view();
+                    self.#field_ident = &*arena.alloc(view);
+                    Ok(())
+                },
+                Label::Repeated => {
+                    // Repeated is handled separately below
+                    unreachable!("Repeated messages/groups handled separately")
+                },
+            };
+
+            quote! {
+                #(#tags)* => {
+                    #merge_code
+                },
+            }
+        } else if is_repeated_message_or_group {
+            // Special handling for repeated messages and groups (inline merge code)
             use crate::field::Label;
 
             // Extract the type path and build the Message companion path
@@ -357,19 +509,32 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
             let builder_type_name = base_path;
 
-            let merge_code = match msg_field.label {
-                Label::Optional => quote! {
-                    #prost_path::encoding::check_wire_type(#prost_path::encoding::WireType::LengthDelimited, wire_type)
-                        .map_err(|mut error| {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
-                            error
-                        })?;
-                    ctx.limit_reached()
-                        .map_err(|mut error| {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
-                            error
-                        })?;
-                    let mut builder = #builder_type_name::new_in(arena);
+            // Groups use StartGroup wire type, messages use LengthDelimited
+            let expected_wire_type = if matches!(field, Field::Group(_)) {
+                quote!(#prost_path::encoding::WireType::StartGroup)
+            } else {
+                quote!(#prost_path::encoding::WireType::LengthDelimited)
+            };
+
+            // Generate the merge code - groups use END_GROUP loop, messages use merge_loop
+            let merge_code = if matches!(field, Field::Group(_)) {
+                // For groups: loop until END_GROUP with matching tag
+                let group_tag = field.tags()[0];  // Groups have a single tag
+                quote! {
+                    loop {
+                        let (field_tag, field_wire_type) = #prost_path::encoding::decode_key(buf)?;
+                        if field_wire_type == #prost_path::encoding::WireType::EndGroup {
+                            if field_tag != #group_tag {
+                                return Err(#prost_path::DecodeError::new("unexpected end group tag"));
+                            }
+                            break;
+                        }
+                        builder.merge_field(field_tag, field_wire_type, buf, ctx.enter_recursion())?;
+                    }
+                }
+            } else {
+                // For messages: use merge_loop
+                quote! {
                     #prost_path::encoding::merge_loop(
                         &mut builder,
                         buf,
@@ -378,74 +543,34 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                             let (tag, wire_type) = #prost_path::encoding::decode_key(buf)?;
                             builder.merge_field(tag, wire_type, buf, ctx)
                         }
-                    ).map_err(|mut error| {
-                        error.push(STRUCT_NAME, stringify!(#field_ident));
-                        error
-                    })?;
-                    let view = builder.into_view();
-                    self.#field_ident = Some(&*arena.alloc(view));
-                    Ok(())
-                },
-                Label::Required => quote! {
-                    #prost_path::encoding::check_wire_type(#prost_path::encoding::WireType::LengthDelimited, wire_type)
-                        .map_err(|mut error| {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
-                            error
-                        })?;
-                    ctx.limit_reached()
-                        .map_err(|mut error| {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
-                            error
-                        })?;
-                    let mut builder = #builder_type_name::new_in(arena);
-                    #prost_path::encoding::merge_loop(
-                        &mut builder,
-                        buf,
-                        ctx.enter_recursion(),
-                        |builder, buf, ctx| {
-                            let (tag, wire_type) = #prost_path::encoding::decode_key(buf)?;
-                            builder.merge_field(tag, wire_type, buf, ctx)
-                        }
-                    ).map_err(|mut error| {
-                        error.push(STRUCT_NAME, stringify!(#field_ident));
-                        error
-                    })?;
-                    let view = builder.into_view();
-                    self.#field_ident = &*arena.alloc(view);
-                    Ok(())
-                },
-                Label::Repeated => quote! {
-                    #prost_path::encoding::check_wire_type(#prost_path::encoding::WireType::LengthDelimited, wire_type)
-                        .map_err(|mut error| {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
-                            error
-                        })?;
-                    ctx.limit_reached()
-                        .map_err(|mut error| {
-                            error.push(STRUCT_NAME, stringify!(#field_ident));
-                            error
-                        })?;
-                    let mut builder = #builder_type_name::new_in(arena);
-                    #prost_path::encoding::merge_loop(
-                        &mut builder,
-                        buf,
-                        ctx.enter_recursion(),
-                        |builder, buf, ctx| {
-                            let (tag, wire_type) = #prost_path::encoding::decode_key(buf)?;
-                            builder.merge_field(tag, wire_type, buf, ctx)
-                        }
-                    ).map_err(|mut error| {
-                        error.push(STRUCT_NAME, stringify!(#field_ident));
-                        error
-                    })?;
-                    self.#field_ident.push(builder.into_view());
-                    Ok(())
-                },
+                    )?;
+                }
+            };
+
+            // For repeated messages, convert builder to view before pushing (BumpVec stores view types)
+            // For repeated groups, push builder directly (BumpVec stores builder types)
+            let push_code = if matches!(field, Field::Group(_)) {
+                quote!(self.#field_ident.push(builder);)
+            } else {
+                quote!(self.#field_ident.push(builder.into_view());)
             };
 
             quote! {
                 #(#tags)* => {
+                    #prost_path::encoding::check_wire_type(#expected_wire_type, wire_type)
+                        .map_err(|mut error| {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error
+                        })?;
+                    ctx.limit_reached()
+                        .map_err(|mut error| {
+                            error.push(STRUCT_NAME, stringify!(#field_ident));
+                            error
+                        })?;
+                    let mut builder = #builder_type_name::new_in(arena);
                     #merge_code
+                    #push_code
+                    Ok(())
                 },
             }
         } else {
@@ -519,7 +644,37 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
             // For repeated fields, convert &[T] → BumpVec<T>
             // For map fields (ArenaMap<K,V>), convert to BumpVec<(K,V)>
-            let message_field_type = if matches!(field, Field::Map(_)) {
+            // For repeated groups, use Vec (groups are deprecated, use Vec not BumpVec)
+            let message_field_type = if matches!(field, Field::Group(_)) && field.is_repeated() {
+                // Groups use Vec<TMessage> - need builder types, not view types!
+                // Extract view type from &'arena [ViewType<'arena>]
+                let view_type = if let syn::Type::Reference(type_ref) = field_type {
+                    if let syn::Type::Slice(type_slice) = &*type_ref.elem {
+                        &type_slice.elem
+                    } else {
+                        field_type
+                    }
+                } else {
+                    field_type
+                };
+
+                // Convert view type to builder type by appending "Message"
+                // e.g., Group1<'arena> → Group1Message<'arena>
+                let builder_type = if let syn::Type::Path(type_path) = view_type {
+                    let mut builder_path = type_path.clone();
+                    if let Some(last_seg) = builder_path.path.segments.last_mut() {
+                        let view_ident = &last_seg.ident;
+                        let builder_ident = Ident::new(&format!("{}Message", view_ident), view_ident.span());
+                        last_seg.ident = builder_ident;
+                    }
+                    quote!(#builder_path)
+                } else {
+                    quote!(#view_type)
+                };
+
+                // Use BumpVec, not Vec, for repeated group builder types
+                quote!(#prost_path::arena::BumpVec<'arena, #builder_type>)
+            } else if matches!(field, Field::Map(_)) {
                 // Extract K and V from ArenaMap<'arena, K, V>
                 let extracted_type = if let syn::Type::Path(type_path) = field_type {
                     if let Some(last_seg) = type_path.path.segments.last() {
@@ -581,8 +736,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // Generate new_in() constructor and setter methods for *Message
     let message_impl = if is_struct {
         let field_inits = fields_with_types.iter().map(|(field_ident, _field_type, field)| {
+            use crate::field::Field;
             if field.is_repeated() {
-                // Repeated fields initialize with arena.new_vec()
+                // Other repeated fields initialize with arena.new_vec()
                 quote!(#field_ident: arena.new_vec())
             } else {
                 // Non-repeated fields use default values
@@ -648,6 +804,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                                 self.#field_ident.push(value);
                             }
                         }
+                    }
+                    Field::Group(_) => {
+                        // Skip push methods for repeated groups - they use builder types internally
+                        // and are populated via group::merge_repeated during decoding
+                        quote!()
                     }
                     _ => quote!()
                 }
@@ -746,6 +907,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         let getter_methods = fields_with_types.iter().map(|(field_ident, field_type, field)| {
             use crate::field::Field;
 
+            // Skip getters for repeated groups in builder - they use Vec<TMessage> internally
+            // and will be properly exposed via the view type
+            if matches!(field, Field::Group(_)) && field.is_repeated() {
+                return quote!();
+            }
+
             // For getters, use the field identifier directly (preserving r# for keywords)
             let method_name = field_ident.clone();
 
@@ -828,22 +995,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                         #prost_path::ArenaMap::new(entries.into_bump_slice())
                     }
                 }
+            } else if matches!(field, Field::Group(_)) && field.is_repeated() {
+                // Repeated groups use Vec<TMessage> - convert each builder to view, then to arena slice
+                quote!(#field_ident: self.arena.alloc_slice_fill_iter(self.#field_ident.into_iter().map(|b| b.into_view())))
             } else if field.is_repeated() {
-                // For repeated fields, convert BumpVec to arena slice
+                // For repeated fields (non-group), convert BumpVec to arena slice
                 quote!(#field_ident: self.#field_ident.into_bump_slice())
             } else {
                 // For singular fields, move value
                 quote!(#field_ident: self.#field_ident)
             }
         }).collect();
-
-        // Add _phantom field initialization if the original struct has a _phantom field
-        // (This happens for structs with lifetimes but only owned data)
-        let phantom_init = if has_phantom_field {
-            quote!(_phantom: ::core::marker::PhantomData,)
-        } else {
-            quote!()
-        };
 
         if needs_arena {
             quote! {
@@ -862,7 +1024,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     pub fn into_view(self) -> #ident #ty_generics {
                         #ident {
                             #(#into_view_field_inits,)*
-                            #phantom_init
                         }
                     }
 
@@ -900,7 +1061,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     pub fn into_view(self) -> #ident #ty_generics {
                         #ident {
                             #(#into_view_field_inits,)*
-                            #phantom_init
                         }
                     }
 
@@ -959,6 +1119,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         quote!()
     };
+
 
     // Generate standalone encode method for View
     // Generate Message impl for view types (arena-allocated messages)

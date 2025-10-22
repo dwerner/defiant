@@ -1101,10 +1101,10 @@ pub mod message {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message<'arena> + Default,
+        M: Message<'arena>,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
-        let mut msg = M::default();
+        let mut msg = M::new_in(arena);
         merge(WireType::LengthDelimited, &mut msg, buf, arena, ctx)?;
         messages.push(msg);
         Ok(())
@@ -1185,16 +1185,16 @@ pub mod group {
     pub fn merge_repeated<'arena, M>(
         tag: u32,
         wire_type: WireType,
-        messages: &mut Vec<M>,
+        messages: &mut crate::arena::BumpVec<'arena, M>,
         buf: &mut impl Buf,
         arena: &'arena Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message<'arena> + Default,
+        M: Message<'arena>,
     {
         check_wire_type(WireType::StartGroup, wire_type)?;
-        let mut msg = M::default();
+        let mut msg = M::new_in(arena);
         merge(tag, WireType::StartGroup, &mut msg, buf, arena, ctx)?;
         messages.push(msg);
         Ok(())

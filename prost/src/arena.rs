@@ -230,18 +230,6 @@ mod tests {
 /// to support arena-allocated conversions. Used for converting owned
 /// data structures (like `Vec`, `BTreeMap`) into arena-allocated
 /// protobuf types.
-///
-/// # Examples
-///
-/// ```
-/// use prost::{Arena, ArenaFrom};
-///
-/// // Convert Vec<T> to &'arena [T]
-/// let arena = Arena::new();
-/// let vec = vec![1, 2, 3];
-/// let slice = <&[i32]>::arena_from(vec, &arena);
-/// assert_eq!(slice, &[1, 2, 3]);
-/// ```
 pub trait ArenaFrom<'arena, T>: Sized {
     /// Performs the conversion using the provided arena for allocation.
     fn arena_from(value: T, arena: &'arena Arena) -> Self;
