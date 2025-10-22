@@ -15,17 +15,17 @@ use crate::{BytesType, Config, MapType, ServiceGenerator};
 ///
 /// A `Context` is built once in the generation process and is reused by
 /// `CodeGenerator` instances created to generate code for each input file.
-pub struct Context<'a> {
-    config: &'a mut Config,
-    message_graph: MessageGraph,
+pub struct Context<'a, 'arena> {
+    config: &'a mut Config<'arena>,
+    message_graph: MessageGraph<'arena>,
     extern_paths: ExternPaths,
     prost_path_attribute: Option<String>,
 }
 
-impl<'a> Context<'a> {
+impl<'a, 'arena> Context<'a, 'arena> {
     pub fn new(
-        config: &'a mut Config,
-        message_graph: MessageGraph,
+        config: &'a mut Config<'arena>,
+        message_graph: MessageGraph<'arena>,
         extern_paths: ExternPaths,
     ) -> Self {
         let prost_path_attribute = config
@@ -41,7 +41,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn config(&self) -> &Config {
+    pub fn config(&self) -> &Config<'arena> {
         self.config
     }
 

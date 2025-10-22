@@ -12,14 +12,17 @@ use prost_types::{
 /// `MessageGraph` builds a graph of messages whose edges correspond to nesting.
 /// The goal is to recognize when message types are recursively nested, so
 /// that fields can be boxed when necessary.
-pub struct MessageGraph {
+pub struct MessageGraph<'arena> {
     index: HashMap<String, NodeIndex>,
     graph: Graph<String, ()>,
-    messages: HashMap<String, DescriptorProto>,
+    messages: HashMap<String, DescriptorProto<'arena>>,
 }
 
-impl MessageGraph {
-    pub(crate) fn new<'a>(files: impl Iterator<Item = &'a FileDescriptorProto>) -> MessageGraph {
+impl<'arena> MessageGraph<'arena> {
+    pub(crate) fn new<'a>(files: impl Iterator<Item = &'a FileDescriptorProto<'arena>>) -> MessageGraph<'arena>
+    where
+        'arena: 'a,
+    {
         let mut msg_graph = MessageGraph {
             index: HashMap::new(),
             graph: Graph::new(),
@@ -32,7 +35,7 @@ impl MessageGraph {
                 if file.package.is_some() { "." } else { "" },
                 file.package.as_deref().unwrap_or("")
             );
-            for msg in &file.message_type {
+            for msg in file.message_type {
                 msg_graph.add_message(&package, msg);
             }
         }
@@ -53,19 +56,19 @@ impl MessageGraph {
     /// Because prost does not box message fields, recursively nested messages would not compile in Rust.
     /// To allow recursive messages, the message graph is used to detect recursion and automatically box the recursive field.
     /// Since repeated messages are already put in a Vec, boxing them isn’t necessary even if the reference is recursive.
-    fn add_message(&mut self, package: &str, msg: &DescriptorProto) {
+    fn add_message(&mut self, package: &str, msg: &DescriptorProto<'arena>) {
         let msg_name = format!("{}.{}", package, msg.name.as_ref().unwrap());
         let msg_index = self.get_or_insert_index(msg_name.clone());
 
-        for field in &msg.field {
+        for field in msg.field {
             if field.r#type() == Type::Message && field.label() != Label::Repeated {
-                let field_index = self.get_or_insert_index(field.type_name.clone().unwrap());
+                let field_index = self.get_or_insert_index(field.type_name.unwrap().to_string());
                 self.graph.add_edge(msg_index, field_index, ());
             }
         }
         self.messages.insert(msg_name.clone(), msg.clone());
 
-        for msg in &msg.nested_type {
+        for msg in msg.nested_type {
             self.add_message(&msg_name, msg);
         }
     }

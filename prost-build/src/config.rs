@@ -1,10 +1,11 @@
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::default;
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
-use std::fs;
-use std::io::{Error, ErrorKind, Result, Write};
+use std::fs::{self, File};
+use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
@@ -27,7 +28,7 @@ use crate::ServiceGenerator;
 /// Configuration options for Protobuf code generation.
 ///
 /// This configuration builder can be used to set non-default code generation options.
-pub struct Config {
+pub struct Config<'arena> {
     pub(crate) file_descriptor_set_path: Option<PathBuf>,
     pub(crate) service_generator: Option<Box<dyn ServiceGenerator>>,
     pub(crate) map_type: PathMap<MapType>,
@@ -55,12 +56,46 @@ pub struct Config {
     pub(crate) prost_types_path: Option<String>,
     #[cfg(feature = "format")]
     pub(crate) fmt: bool,
+    /// Arena for allocating prost-types messages during build
+    pub(crate) arena: &'arena prost::Arena,
 }
 
-impl Config {
+impl<'arena> Config<'arena> {
     /// Creates a new code generator configuration with default options.
-    pub fn new() -> Config {
-        Config::default()
+    ///
+    /// # Arguments
+    /// * `arena` - Arena for allocating prost-types messages during code generation
+    pub fn new(arena: &'arena prost::Arena) -> Config<'arena> {
+        Config {
+            file_descriptor_set_path: None,
+            service_generator: None,
+            map_type: PathMap::default(),
+            bytes_type: PathMap::default(),
+            type_attributes: PathMap::default(),
+            message_attributes: PathMap::default(),
+            enum_attributes: PathMap::default(),
+            field_attributes: PathMap::default(),
+            boxed: PathMap::default(),
+            prost_types: true,
+            strip_enum_prefix: true,
+            out_dir: None,
+            extern_paths: Vec::new(),
+            default_package_filename: "_".to_string(),
+            enable_type_names: false,
+            type_name_domains: PathMap::default(),
+            protoc_args: Vec::new(),
+            protoc_executable: protoc_from_env(),
+            disable_comments: PathMap::default(),
+            skip_debug: PathMap::default(),
+            skip_protoc_run: false,
+            skip_source_info: false,
+            include_file: None,
+            prost_path: None,
+            prost_types_path: None,
+            #[cfg(feature = "format")]
+            fmt: false,
+            arena,
+        }
     }
 
     /// Configure the code generator to generate Rust [`BTreeMap`][1] fields for Protobuf
@@ -824,7 +859,7 @@ impl Config {
     ///     .compile_fds(file_descriptor_set)
     /// }
     /// ```
-    pub fn compile_fds(&mut self, fds: FileDescriptorSet) -> Result<()> {
+    pub fn compile_fds(&mut self, fds: FileDescriptorSet<'arena>) -> Result<()> {
         let mut target_is_env = false;
         let target: PathBuf = self.out_dir.clone().map(Ok).unwrap_or_else(|| {
             env::var_os("OUT_DIR")
@@ -920,7 +955,7 @@ impl Config {
         &mut self,
         protos: &[impl AsRef<Path>],
         includes: &[impl AsRef<Path>],
-    ) -> Result<FileDescriptorSet> {
+    ) -> Result<FileDescriptorSet<'arena>> {
         let tmp;
         let file_descriptor_set_path = if let Some(path) = &self.file_descriptor_set_path {
             path.clone()
@@ -1000,8 +1035,7 @@ impl Config {
                 ),
             )
         })?;
-        let arena = Arena::new();
-        let file_descriptor_set = FileDescriptorSet::decode(buf.as_slice(), &arena).map_err(|error| {
+        let file_descriptor_set = FileDescriptorSet::decode(buf.as_slice(), &self.arena).map_err(|error| {
             Error::new(
                 ErrorKind::InvalidInput,
                 format!("invalid FileDescriptorSet: {error}"),
@@ -1043,7 +1077,6 @@ impl Config {
         // [1]: https://doc.rust-lang.org/cargo/reference/build-scripts.html#outputs-of-the-build-script
 
         let file_descriptor_set = self.load_fds(protos, includes)?;
-
         self.compile_fds(file_descriptor_set)
     }
 
@@ -1114,12 +1147,12 @@ impl Config {
     /// `build.rs` file, instead use [`Self::compile_protos()`].
     pub fn generate(
         &mut self,
-        requests: Vec<(Module, FileDescriptorProto)>,
+        requests: Vec<(Module, &'arena FileDescriptorProto<'arena>)>,
     ) -> Result<HashMap<Module, String>> {
         let mut modules = HashMap::new();
         let mut packages = HashMap::new();
 
-        let message_graph = MessageGraph::new(requests.iter().map(|x| &x.1));
+        let message_graph = MessageGraph::new(requests.iter().map(|x| x.1));
         let extern_paths = ExternPaths::new(
             &self.extern_paths,
             self.prost_path_or_default(),
@@ -1137,7 +1170,7 @@ impl Config {
             let buf = modules
                 .entry(request_module.clone())
                 .or_insert_with(String::new);
-            CodeGenerator::generate(&mut context, request_fd, buf);
+            CodeGenerator::generate(&mut context, request_fd.clone(), buf);
             if buf.is_empty() {
                 // Did not generate any code, remove from list to avoid inclusion in include file or output file list
                 modules.remove(&request_module);
@@ -1193,41 +1226,9 @@ fn write_file_if_changed(path: &Path, content: &[u8]) -> std::io::Result<()> {
     }
 }
 
-impl default::Default for Config {
-    fn default() -> Config {
-        Config {
-            file_descriptor_set_path: None,
-            service_generator: None,
-            map_type: PathMap::default(),
-            bytes_type: PathMap::default(),
-            type_attributes: PathMap::default(),
-            message_attributes: PathMap::default(),
-            enum_attributes: PathMap::default(),
-            field_attributes: PathMap::default(),
-            boxed: PathMap::default(),
-            prost_types: true,
-            strip_enum_prefix: true,
-            out_dir: None,
-            extern_paths: Vec::new(),
-            default_package_filename: "_".to_string(),
-            enable_type_names: false,
-            type_name_domains: PathMap::default(),
-            protoc_args: Vec::new(),
-            protoc_executable: protoc_from_env(),
-            disable_comments: PathMap::default(),
-            skip_debug: PathMap::default(),
-            skip_protoc_run: false,
-            skip_source_info: false,
-            include_file: None,
-            prost_path: None,
-            prost_types_path: None,
-            #[cfg(feature = "format")]
-            fmt: true,
-        }
-    }
-}
+// Note: No Default impl for Config because it requires an arena parameter
 
-impl fmt::Debug for Config {
+impl<'arena> fmt::Debug for Config<'arena> {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Config")
             .field("file_descriptor_set_path", &self.file_descriptor_set_path)
@@ -1317,7 +1318,8 @@ mod tests {
 
     #[test]
     fn test_error_protoc_not_found() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
         config.protoc_executable("path-does-not-exist");
 
         let err = config.load_fds(&[""], &[""]).unwrap_err();
@@ -1326,7 +1328,8 @@ mod tests {
 
     #[test]
     fn test_error_protoc_not_executable() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
         config.protoc_executable("src/lib.rs");
 
         let err = config.load_fds(&[""], &[""]).unwrap_err();
@@ -1335,7 +1338,8 @@ mod tests {
 
     #[test]
     fn test_error_incorrect_skip_protoc_run() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
         config.skip_protoc_run();
 
         let err = config.load_fds(&[""], &[""]).unwrap_err();
@@ -1347,7 +1351,8 @@ mod tests {
 
     #[test]
     fn test_error_protoc_failed() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
 
         let err = config.load_fds(&[""], &[""]).unwrap_err();
         assert_starts_with!(
@@ -1358,7 +1363,8 @@ mod tests {
 
     #[test]
     fn test_error_non_existing_file_descriptor_set() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
         config.skip_protoc_run();
         config.file_descriptor_set_path("path-does-not-exist");
 
@@ -1371,7 +1377,8 @@ mod tests {
 
     #[test]
     fn test_error_text_incorrect_file_descriptor_set() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
         config.skip_protoc_run();
         config.file_descriptor_set_path("src/lib.rs");
 
@@ -1384,10 +1391,12 @@ mod tests {
 
     #[test]
     fn test_error_unset_out_dir() {
-        let mut config = Config::new();
+        let arena = prost::Arena::new();
+        let mut config = Config::new(&arena);
 
+        let fds = FileDescriptorSet { file: &[] };
         let err = config
-            .compile_fds(FileDescriptorSet::default())
+            .compile_fds(fds)
             .unwrap_err();
         assert_eq!(err.to_string(), "OUT_DIR environment variable is not set")
     }

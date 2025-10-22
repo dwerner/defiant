@@ -26,15 +26,15 @@ mod syntax;
 use syntax::Syntax;
 
 /// State object for the code generation process on a single input file.
-pub struct CodeGenerator<'a, 'b> {
-    context: &'a mut Context<'b>,
+pub struct CodeGenerator<'buf, 'ctx, 'arena> {
+    context: &'buf mut Context<'ctx, 'arena>,
     package: String,
     type_path: Vec<String>,
-    source_info: Option<SourceCodeInfo>,
+    source_info: Option<SourceCodeInfo<'arena>>,
     syntax: Syntax,
     depth: u8,
     path: Vec<i32>,
-    buf: &'a mut String,
+    buf: &'buf mut String,
 }
 
 fn push_indent(buf: &mut String, depth: u8) {
@@ -43,13 +43,13 @@ fn push_indent(buf: &mut String, depth: u8) {
     }
 }
 
-struct Field {
-    descriptor: FieldDescriptorProto,
+struct Field<'arena> {
+    descriptor: FieldDescriptorProto<'arena>,
     path_index: i32,
 }
 
-impl Field {
-    fn new(descriptor: FieldDescriptorProto, path_index: i32) -> Self {
+impl<'arena> Field<'arena> {
+    fn new(descriptor: FieldDescriptorProto<'arena>, path_index: i32) -> Self {
         Self {
             descriptor,
             path_index,
@@ -61,19 +61,19 @@ impl Field {
     }
 }
 
-struct OneofField {
-    descriptor: OneofDescriptorProto,
-    fields: Vec<Field>,
+struct OneofField<'arena> {
+    descriptor: OneofDescriptorProto<'arena>,
+    fields: Vec<Field<'arena>>,
     path_index: i32,
     // This type has the same name as another nested type at the same level
     has_type_name_conflict: bool,
 }
 
-impl OneofField {
+impl<'arena> OneofField<'arena> {
     fn new(
-        parent: &DescriptorProto,
-        descriptor: OneofDescriptorProto,
-        fields: Vec<Field>,
+        parent: &DescriptorProto<'arena>,
+        descriptor: OneofDescriptorProto<'arena>,
+        fields: Vec<Field<'arena>>,
         path_index: i32,
     ) -> Self {
         let has_type_name_conflict = parent
@@ -102,26 +102,21 @@ impl OneofField {
     }
 }
 
-impl<'b> CodeGenerator<'_, 'b> {
+impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
     fn config(&self) -> &Config {
         self.context.config()
     }
 
-    pub(crate) fn generate(context: &mut Context<'b>, file: FileDescriptorProto, buf: &mut String) {
-        let source_info = file.source_code_info.map(|mut s| {
-            s.location.retain(|loc| {
-                let len = loc.path.len();
-                len > 0 && len % 2 == 0
-            });
-            s.location.sort_by(|a, b| a.path.cmp(&b.path));
-            s
-        });
+    pub(crate) fn generate(context: &mut Context<'ctx, 'arena>, file: FileDescriptorProto<'arena>, buf: &mut String) {
+        // Use source info as-is from arena (can't filter/sort immutable slice)
+        // TODO: Consider pre-sorting at proto parse time or using linear search
+        let source_info = file.source_code_info;
 
         let mut code_gen = CodeGenerator {
             context,
-            package: file.package.unwrap_or_default(),
+            package: file.package.unwrap_or("").to_string(),
             type_path: Vec::new(),
-            source_info,
+            source_info: source_info.cloned(),
             syntax: file.syntax.as_deref().into(),
             depth: 0,
             path: Vec::new(),
@@ -166,7 +161,7 @@ impl<'b> CodeGenerator<'_, 'b> {
         }
     }
 
-    fn append_message(&mut self, message: DescriptorProto) {
+    fn append_message(&mut self, message: &DescriptorProto<'arena>) {
         debug!("  message: {:?}", message.name());
 
         let message_name = message.name().to_string();
@@ -184,9 +179,9 @@ impl<'b> CodeGenerator<'_, 'b> {
         // Split the nested message types into a vector of normal nested message types, and a map
         // of the map field entry types. The path index of the nested message types is preserved so
         // that comments can be retrieved.
-        type NestedTypes = Vec<(DescriptorProto, usize)>;
-        type MapTypes = HashMap<String, (FieldDescriptorProto, FieldDescriptorProto)>;
-        let (nested_types, map_types): (NestedTypes, MapTypes) = message
+        type NestedTypes<'arena> = Vec<(DescriptorProto<'arena>, usize)>;
+        type MapTypes<'arena> = HashMap<String, (FieldDescriptorProto<'arena>, FieldDescriptorProto<'arena>)>;
+        let (nested_types, map_types): (NestedTypes<'arena>, MapTypes<'arena>) = message
             .nested_type
             .iter()
             .enumerate()
@@ -211,8 +206,8 @@ impl<'b> CodeGenerator<'_, 'b> {
 
         // Split the fields into a vector of the normal fields, and oneof fields.
         // Path indexes are preserved so that comments can be retrieved.
-        type OneofFieldsByIndex = MultiMap<i32, Field>;
-        let (fields, mut oneof_map): (Vec<Field>, OneofFieldsByIndex) = message
+        type OneofFieldsByIndex<'arena> = MultiMap<i32, Field<'arena>>;
+        let (fields, mut oneof_map): (Vec<Field<'arena>>, OneofFieldsByIndex<'arena>) = message
             .field
             .iter()
             .enumerate()
@@ -272,7 +267,7 @@ impl<'b> CodeGenerator<'_, 'b> {
                 .descriptor
                 .type_name
                 .as_ref()
-                .and_then(|type_name| map_types.get(type_name))
+                .and_then(|type_name| map_types.get(*type_name))
             {
                 Some((key, value)) => self.append_map_field(&fq_message_name, field, key, value),
                 None => self.append_field(&fq_message_name, field),
@@ -298,7 +293,7 @@ impl<'b> CodeGenerator<'_, 'b> {
             self.path.push(3);
             for (nested_type, idx) in nested_types {
                 self.path.push(idx as i32);
-                self.append_message(nested_type);
+                self.append_message(&nested_type);
                 self.path.pop();
             }
             self.path.pop();
@@ -707,11 +702,15 @@ impl<'b> CodeGenerator<'_, 'b> {
 
     fn location(&self) -> Option<&Location> {
         let source_info = self.source_info.as_ref()?;
-        let idx = source_info
+        // Linear search since we can't pre-sort arena-allocated data
+        // Filter to valid paths (len > 0 && len % 2 == 0) as original code did
+        source_info
             .location
-            .binary_search_by_key(&&self.path[..], |location| &location.path[..])
-            .unwrap();
-        Some(&source_info.location[idx])
+            .iter()
+            .find(|loc| {
+                let len = loc.path.len();
+                len > 0 && len % 2 == 0 && loc.path == self.path
+            })
     }
 
     fn append_doc(&mut self, fq_name: &str, field_name: Option<&str>) {
@@ -722,7 +721,7 @@ impl<'b> CodeGenerator<'_, 'b> {
         }
     }
 
-    fn append_enum(&mut self, desc: EnumDescriptorProto) {
+    fn append_enum(&mut self, desc: &EnumDescriptorProto<'arena>) {
         debug!("  enum: {:?}", desc.name());
 
         let proto_enum_name = desc.name();
@@ -883,7 +882,7 @@ impl<'b> CodeGenerator<'_, 'b> {
         self.buf.push_str("}\n"); // End of impl
     }
 
-    fn push_service(&mut self, service: ServiceDescriptorProto) {
+    fn push_service(&mut self, service: &ServiceDescriptorProto<'arena>) {
         let name = service.name().to_owned();
         debug!("  service: {:?}", name);
 
@@ -907,9 +906,9 @@ impl<'b> CodeGenerator<'_, 'b> {
                     .unwrap_or_default();
                 self.path.pop();
 
-                let name = method.name.take().unwrap();
-                let input_proto_type = method.input_type.take().unwrap();
-                let output_proto_type = method.output_type.take().unwrap();
+                let name = method.name.unwrap();
+                let input_proto_type = method.input_type.unwrap();
+                let output_proto_type = method.output_type.unwrap();
                 let input_type = self.resolve_ident(&input_proto_type);
                 let output_type = self.resolve_ident(&output_proto_type);
                 let client_streaming = method.client_streaming();
@@ -917,13 +916,17 @@ impl<'b> CodeGenerator<'_, 'b> {
 
                 Method {
                     name: to_snake(&name),
-                    proto_name: name,
+                    proto_name: name.to_string(),
                     comments,
                     input_type,
                     output_type,
-                    input_proto_type,
-                    output_proto_type,
-                    options: method.options.unwrap_or_default(),
+                    input_proto_type: input_proto_type.to_string(),
+                    output_proto_type: output_proto_type.to_string(),
+                    options: method.options.cloned().unwrap_or(prost_types::MethodOptions {
+                        deprecated: None,
+                        idempotency_level: None,
+                        uninterpreted_option: &[],
+                    }),
                     client_streaming,
                     server_streaming,
                 }
@@ -937,7 +940,10 @@ impl<'b> CodeGenerator<'_, 'b> {
             package: self.package.clone(),
             comments,
             methods,
-            options: service.options.unwrap_or_default(),
+            options: service.options.cloned().unwrap_or(prost_types::ServiceOptions {
+                deprecated: None,
+                uninterpreted_option: &[],
+            }),
         };
 
         if let Some(service_generator) = self.context.service_generator_mut() {
@@ -1084,7 +1090,7 @@ impl<'b> CodeGenerator<'_, 'b> {
 
     /// Returns `true` if the field options includes the `deprecated` option.
     fn deprecated(&self, field: &FieldDescriptorProto) -> bool {
-        field.options.as_ref().is_some_and(FieldOptions::deprecated)
+        field.options.as_ref().is_some_and(|opts| FieldOptions::deprecated(opts))
     }
 
     /// Returns the fully-qualified name, starting with a dot
@@ -1172,5 +1178,5 @@ fn enum_field_deprecated(value: &EnumValueDescriptorProto) -> bool {
     value
         .options
         .as_ref()
-        .is_some_and(EnumValueOptions::deprecated)
+        .is_some_and(|opts| EnumValueOptions::deprecated(opts))
 }
