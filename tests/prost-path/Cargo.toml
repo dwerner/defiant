@@ -10,6 +10,7 @@ license = "MIT"
 reexported_prost = { path = "../reexported-prost" }
 
 [build-dependencies]
+prost = { path = "../../prost" }
 prost-build = { path = "../../prost-build" }
 
 [package.metadata.cargo-machete]

@@ -10,4 +10,5 @@ license = "MIT"
 prost = { path = "../../prost" }
 
 [build-dependencies]
+prost = { path = "../../prost" }
 prost-build = { path = "../../prost-build" }

@@ -11,6 +11,7 @@ prost-types = { path = "../prost-types" }
 
 [build-dependencies]
 anyhow = "1.0.1"
+prost = { path = "../prost" }
 prost-build = { path = "../prost-build" }
 tempfile = "3"
 cmake = "0.1.51"

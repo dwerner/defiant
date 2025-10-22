@@ -152,12 +152,12 @@ impl RoundtripResult {
 
 /// Tests round-tripping a message type. The message should be compiled with `BTreeMap` fields,
 /// otherwise the comparison may fail due to inconsistent `HashMap` entry encoding ordering.
-pub fn roundtrip<M>(data: &[u8]) -> RoundtripResult
+pub fn roundtrip<'arena, M>(data: &[u8], arena: &'arena prost::Arena) -> RoundtripResult
 where
-    M: Message + Default,
+    M: Message<'arena>,
 {
     // Try to decode a message from the data. If decoding fails, continue.
-    let all_types = match M::decode(data) {
+    let all_types = match M::decode(data, &arena) {
         Ok(all_types) => all_types,
         Err(error) => return RoundtripResult::DecodeError(error),
     };
@@ -181,7 +181,7 @@ where
         ));
     }
 
-    let roundtrip = match M::decode(buf1.as_slice()) {
+    let roundtrip = match M::decode(buf1.as_slice(), &arena) {
         Ok(roundtrip) => roundtrip,
         Err(error) => return RoundtripResult::Error(anyhow!(error)),
     };
@@ -214,9 +214,9 @@ where
 }
 
 /// Generic roundtrip serialization check for messages.
-pub fn check_message<M>(msg: &M)
+pub fn check_message<'arena, M>(msg: &M, arena: &'arena prost::Arena)
 where
-    M: Debug + Message + Default + PartialEq,
+    M: Debug + Message<'arena> + PartialEq,
 {
     let expected_len = msg.encoded_len();
 
@@ -225,7 +225,7 @@ where
     assert_eq!(expected_len, buf.len());
 
     let mut buf = buf.as_slice();
-    let roundtrip = M::decode(&mut buf).unwrap();
+    let roundtrip = M::decode(&mut buf, &arena).unwrap();
 
     assert!(
         !buf.has_remaining(),
@@ -236,10 +236,10 @@ where
 }
 
 /// Serialize from A should equal Serialize from B
-pub fn check_serialize_equivalent<M, N>(msg_a: &M, msg_b: &N)
+pub fn check_serialize_equivalent<'arena, M, N>(msg_a: &M, msg_b: &N)
 where
-    M: Message + Default + PartialEq,
-    N: Message + Default + PartialEq,
+    M: Message<'arena> + PartialEq,
+    N: Message<'arena> + PartialEq,
 {
     let mut buf_a = Vec::new();
     msg_a.encode(&mut buf_a).unwrap();

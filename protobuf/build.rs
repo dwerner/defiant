@@ -6,6 +6,7 @@ use std::process::Command;
 use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
+    let arena = prost::Arena::new();
     let out_dir =
         &PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR environment variable not set"));
 
@@ -37,7 +38,7 @@ fn main() -> Result<()> {
     let protoc_executable = protobuf_dir.join("bin").join("protoc");
 
     let conformance_proto_dir = src_dir.join("conformance");
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .protoc_executable(&protoc_executable)
         .compile_protos(
             &[conformance_proto_dir.join("conformance.proto")],
@@ -51,7 +52,7 @@ fn main() -> Result<()> {
     // that encode/decode roundtrips can use encoded output for comparison. Otherwise trying to
     // compare based on the Rust PartialEq implementations is difficult, due to presence of NaN
     // values.
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .protoc_executable(&protoc_executable)
         .btree_map(["."])
         .compile_protos(

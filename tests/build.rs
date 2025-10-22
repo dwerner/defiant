@@ -21,11 +21,14 @@ fn main() {
     let src = Path::new("../tests/src");
     let includes = &[src];
 
+    // Arena for code generation
+    let arena = prost::Arena::new();
+
     // Generate BTreeMap fields for all messages. This forces encoded output to be consistent, so
     // that encode/decode roundtrips can use encoded output for comparison. Otherwise trying to
     // compare based on the Rust PartialEq implementations is difficult, due to presence of NaN
     // values.
-    let mut config = prost_build::Config::new();
+    let mut config = prost_build::Config::new(&arena);
     config.btree_map(["."]);
     config.type_attribute(
         "Foo.Custom.OneOfAttrs.Msg.field",
@@ -37,7 +40,7 @@ fn main() {
             .join("file_descriptor_set.bin"),
     );
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .btree_map(["."])
         // Tests for custom attributes
         .type_attribute(
@@ -51,16 +54,16 @@ fn main() {
         .compile_protos(&[src.join("ident_conversion.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .btree_map(["."])
         .compile_protos(&[src.join("nesting.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("recursive_oneof.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .type_attribute("custom_attributes.Msg", "#[allow(missing_docs)]")
         .type_attribute("custom_attributes.Msg.field", "/// Oneof docs")
         .type_attribute("custom_attributes.AnEnum", "#[allow(missing_docs)]")
@@ -84,7 +87,7 @@ fn main() {
         .compile_protos(&[src.join("no_unused_results.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("default_enum_value.proto")], includes)
         .unwrap();
 
@@ -92,7 +95,7 @@ fn main() {
         .compile_protos(&[src.join("enum_keyword_variant.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("groups.proto")], includes)
         .unwrap();
 
@@ -100,24 +103,24 @@ fn main() {
         .compile_protos(&[src.join("derive_copy.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("default_string_escape.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .skip_debug(["custom_debug.Msg"])
         .compile_protos(&[src.join("custom_debug.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("result_enum.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("result_struct.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("option_enum.proto")], includes)
         .unwrap();
 
@@ -129,12 +132,12 @@ fn main() {
         .compile_protos(&[src.join("submessage_without_package.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .protoc_arg("--experimental_allow_proto3_optional")
         .compile_protos(&[src.join("proto3_presence.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .disable_comments(["."])
         .compile_protos(&[src.join("disable_comments.proto")], includes)
         .unwrap();
@@ -149,7 +152,7 @@ fn main() {
 
     std::fs::create_dir_all(&out_path).unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .bytes(["."])
         .out_dir(out_path)
         .include_file("wellknown_include.rs")
@@ -163,21 +166,21 @@ fn main() {
         )
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .enable_type_names()
         .type_name_domain([".type_names.Foo"], "tests")
         .type_name_domain([".type_names.Qux"], "tests-cumulative")
         .compile_protos(&[src.join("type_names.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .boxed("Foo.bar")
         .boxed("Foo.oneof_field.box_qux")
         .boxed("Foo.boxed_bar_list")
         .compile_protos(&[src.join("boxed_field.proto")], includes)
         .unwrap();
 
-    prost_build::Config::new()
+    prost_build::Config::new(&arena)
         .compile_protos(&[src.join("oneof_name_conflict.proto")], includes)
         .unwrap();
 
@@ -192,7 +195,7 @@ fn main() {
     let no_root_packages = out_dir.as_path().join("no_root_packages");
 
     fs::create_dir_all(&no_root_packages).expect("failed to create prefix directory");
-    let mut no_root_packages_config = prost_build::Config::new();
+    let mut no_root_packages_config = prost_build::Config::new(&arena);
     no_root_packages_config
         .out_dir(&no_root_packages)
         .default_package_filename("__.default")
@@ -207,7 +210,7 @@ fn main() {
     let no_root_packages_with_default = out_dir.as_path().join("no_root_packages_with_default");
 
     fs::create_dir_all(&no_root_packages_with_default).expect("failed to create prefix directory");
-    let mut no_root_packages_config = prost_build::Config::new();
+    let mut no_root_packages_config = prost_build::Config::new(&arena);
     no_root_packages_config
         .out_dir(&no_root_packages_with_default)
         .compile_protos(
