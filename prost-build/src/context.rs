@@ -61,6 +61,10 @@ impl<'a, 'arena> Context<'a, 'arena> {
         self.extern_paths.resolve_ident(pb_ident)
     }
 
+    pub fn message_graph(&self) -> &MessageGraph<'arena> {
+        &self.message_graph
+    }
+
     /// Returns an iterator over the additional attributes configured
     /// for the named type.
     pub fn type_attributes(&self, fq_type_name: &str) -> impl Iterator<Item = &str> {

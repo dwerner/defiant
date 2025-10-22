@@ -35,6 +35,8 @@ pub struct CodeGenerator<'buf, 'ctx, 'arena> {
     depth: u8,
     path: Vec<i32>,
     buf: &'buf mut String,
+    /// Tracks which messages need a lifetime parameter (fully-qualified names)
+    messages_with_lifetime: HashSet<String>,
 }
 
 fn push_indent(buf: &mut String, depth: u8) {
@@ -121,6 +123,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             depth: 0,
             path: Vec::new(),
             buf,
+            messages_with_lifetime: HashSet::new(),
         };
 
         debug!(
@@ -254,10 +257,20 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         ));
         self.append_prost_path_attribute();
         self.append_skip_debug(&fq_message_name);
+
+        // Check if this message needs a lifetime parameter
+        let needs_lifetime = self.message_needs_lifetime(message);
+        if needs_lifetime {
+            self.messages_with_lifetime.insert(fq_message_name.clone());
+        }
+
         self.push_indent();
         self.buf.push_str("pub struct ");
         self.buf.push_str(&to_upper_camel(&message_name));
-        self.buf.push_str("<'arena> {\n");
+        if needs_lifetime {
+            self.buf.push_str("<'arena>");
+        }
+        self.buf.push_str(" {\n");
 
         self.depth += 1;
         self.path.push(2);
@@ -274,6 +287,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             }
             self.path.pop();
         }
+
         self.path.pop();
 
         self.path.push(8);
@@ -522,6 +536,10 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             self.buf
                 .push_str(&format!("{prost_path}::alloc::boxed::Box<"));
         }
+        // For message fields (optional or required), store as &'arena T<'arena> in the arena
+        if type_ == Type::Message && !repeated {
+            self.buf.push_str("&'arena ");
+        }
         self.buf.push_str(&ty);
         if boxed {
             self.buf.push('>');
@@ -585,6 +603,22 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         oneof: &OneofField,
     ) {
         let type_name = format!("{}::{}", to_snake(message_name), oneof.type_name());
+
+        // Check if this oneof needs a lifetime parameter
+        let needs_lifetime = oneof.fields.iter().any(|field| {
+            match field.descriptor.r#type() {
+                Type::String | Type::Bytes => true,
+                Type::Message => self.message_type_needs_lifetime(field.descriptor.type_name()),
+                _ => false,
+            }
+        });
+
+        let full_type_name = if needs_lifetime {
+            format!("{}<'arena>", type_name)
+        } else {
+            type_name.clone()
+        };
+
         self.append_doc(fq_message_name, None);
         self.push_indent();
         self.buf.push_str(&format!(
@@ -601,7 +635,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.buf.push_str(&format!(
             "pub {}: ::core::option::Option<{}>,\n",
             oneof.rust_name(),
-            type_name
+            full_type_name
         ));
     }
 
@@ -637,9 +671,22 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         ));
         self.append_prost_path_attribute();
         self.append_skip_debug(fq_message_name);
+
+        // Check if any oneof field needs arena allocation
+        let needs_lifetime = oneof.fields.iter().any(|field| {
+            match field.descriptor.r#type() {
+                Type::String | Type::Bytes => true,
+                Type::Message => self.message_type_needs_lifetime(field.descriptor.type_name()),
+                _ => false,
+            }
+        });
+
         self.push_indent();
         self.buf.push_str("pub enum ");
         self.buf.push_str(&oneof.type_name());
+        if needs_lifetime {
+            self.buf.push_str("<'arena>");
+        }
         self.buf.push_str(" {\n");
 
         self.path.push(2);
@@ -980,6 +1027,64 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.buf.push_str("}\n");
     }
 
+    /// Checks if a message needs a lifetime parameter based on its fields
+    fn message_needs_lifetime(&self, message: &DescriptorProto<'arena>) -> bool {
+        // Check all fields to see if any require arena allocation
+        message.field.iter().any(|field| {
+            // Repeated fields become &'arena [T] slices
+            if field.label() == Label::Repeated {
+                return true;
+            }
+
+            match field.r#type() {
+                // String fields become &'arena str, Bytes become &'arena [u8]
+                Type::String | Type::Bytes => true,
+                // Message fields are ALWAYS stored as &'arena T (even if T has no lifetime)
+                // So any message with a message field needs a lifetime parameter
+                Type::Message => true,
+                // Scalars (int, float, bool) and enums are stack-only
+                _ => false,
+            }
+        })
+    }
+
+    /// Checks if a message type (by fully-qualified name) needs a lifetime parameter
+    fn message_type_needs_lifetime(&self, type_name: &str) -> bool {
+        let mut visited = HashSet::new();
+        self.message_type_needs_lifetime_impl(type_name, &mut visited)
+    }
+
+    fn message_type_needs_lifetime_impl(&self, type_name: &str, visited: &mut HashSet<String>) -> bool {
+        // Detect cycles
+        if !visited.insert(type_name.to_string()) {
+            // If we're in a cycle, conservatively assume it needs a lifetime
+            return true;
+        }
+
+        // Check if it's in our local tracking (for messages in current file)
+        if self.messages_with_lifetime.contains(type_name) {
+            return true;
+        }
+
+        // Try to look it up in the message graph
+        if let Some(message_desc) = self.context.message_graph().get_message(type_name) {
+            // Recursively analyze the message to determine if it needs a lifetime
+            return message_desc.field.iter().any(|field| {
+                if field.label() == Label::Repeated {
+                    return true;
+                }
+                match field.r#type() {
+                    Type::String | Type::Bytes => true,
+                    Type::Message => self.message_type_needs_lifetime_impl(field.type_name(), visited),
+                    _ => false,
+                }
+            });
+        }
+
+        // If we can't find it, conservatively assume it needs a lifetime
+        true
+    }
+
     fn resolve_type(&self, field: &FieldDescriptorProto, fq_message_name: &str) -> String {
         match field.r#type() {
             Type::Float => String::from("f32"),
@@ -989,13 +1094,21 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             Type::Int32 | Type::Sfixed32 | Type::Sint32 | Type::Enum => String::from("i32"),
             Type::Int64 | Type::Sfixed64 | Type::Sint64 => String::from("i64"),
             Type::Bool => String::from("bool"),
-            Type::String => format!("{}::alloc::string::String", self.context.prost_path()),
+            Type::String => String::from("&'arena str"),
             Type::Bytes => self
                 .context
                 .bytes_type(fq_message_name, field.name())
                 .rust_type()
                 .to_owned(),
-            Type::Group | Type::Message => format!("{}<'arena>", self.resolve_ident(field.type_name())),
+            Type::Group | Type::Message => {
+                let ident = self.resolve_ident(field.type_name());
+                // Check if this message type needs a lifetime parameter by analyzing its fields
+                if self.message_type_needs_lifetime(field.type_name()) {
+                    format!("{}<'arena>", ident)
+                } else {
+                    ident
+                }
+            }
         }
     }
 

@@ -48,10 +48,11 @@ impl BytesType {
     }
 
     /// The fully-qualified Rust type corresponding to the bytes type.
+    /// For arena-based messages, returns arena-allocated slices instead of owned types.
     pub fn rust_type(&self) -> &'static str {
         match self {
-            BytesType::Vec => "::prost::alloc::vec::Vec<u8>",
-            BytesType::Bytes => "::prost::bytes::Bytes",
+            BytesType::Vec => "&'arena [u8]",
+            BytesType::Bytes => "&'arena [u8]",
         }
     }
 }
