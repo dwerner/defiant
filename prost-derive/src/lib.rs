@@ -263,12 +263,12 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )
     };
 
-    let encoded_len: Vec<_> = fields
+    let _encoded_len: Vec<_> = fields
         .iter()
         .map(|(field_ident, field)| field.encoded_len(&prost_path, quote!(self.#field_ident)))
         .collect();
 
-    let encode: Vec<_> = fields
+    let _encode: Vec<_> = fields
         .iter()
         .map(|(field_ident, field)| field.encode(&prost_path, quote!(self.#field_ident)))
         .collect();
@@ -498,7 +498,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         } else if is_repeated_message_or_group {
             // Special handling for repeated messages and groups (inline merge code)
-            use crate::field::Label;
 
             // Extract the type path and build the Message companion path
             let mut base_path = extract_type_path(field_type);
@@ -597,7 +596,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         )
     };
 
-    let clear = fields
+    let _clear = fields
         .iter()
         .map(|(field_ident, field)| field.clear(quote!(self.#field_ident)));
 
@@ -736,7 +735,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     // Generate new_in() constructor and setter methods for *Message
     let message_impl = if is_struct {
         let field_inits = fields_with_types.iter().map(|(field_ident, _field_type, field)| {
-            use crate::field::Field;
             if field.is_repeated() {
                 // Other repeated fields initialize with arena.new_vec()
                 quote!(#field_ident: arena.new_vec())
