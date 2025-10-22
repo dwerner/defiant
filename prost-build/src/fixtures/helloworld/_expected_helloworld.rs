@@ -2,14 +2,14 @@
 #[derive(derive_builder::Builder)]
 #[derive(custom_proto::Input)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct Message {
+pub struct Message<'arena> {
     #[prost(string, tag = "1")]
     pub say: ::prost::alloc::string::String,
 }
 #[derive(derive_builder::Builder)]
 #[derive(custom_proto::Output)]
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct Response {
+pub struct Response<'arena> {
     #[prost(string, tag = "1")]
     pub say: ::prost::alloc::string::String,
 }

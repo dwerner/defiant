@@ -248,7 +248,8 @@ pub trait ServiceGenerator {
 /// [3]: https://protobuf.dev/programming-guides/proto3/#importing
 /// [4]: https://protobuf.dev/programming-guides/proto3/#packages
 pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<()> {
-    Config::new().compile_protos(protos, includes)
+    let arena = prost::Arena::new();
+    Config::new(&arena).compile_protos(protos, includes)
 }
 
 /// Compile a [`FileDescriptorSet`] into Rust files during a Cargo build.
@@ -275,8 +276,8 @@ pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]
 /// [`protox`]: https://github.com/andrewhickman/protox
 /// [1]: https://doc.rust-lang.org/std/macro.include.html
 /// [2]: https://doc.rust-lang.org/cargo/reference/build-script-examples.html
-pub fn compile_fds(fds: FileDescriptorSet) -> Result<()> {
-    Config::new().compile_fds(fds)
+pub fn compile_fds<'arena>(arena: &'arena prost::Arena, fds: FileDescriptorSet<'arena>) -> Result<()> {
+    Config::new(arena).compile_fds(fds)
 }
 
 #[cfg(test)]
@@ -383,8 +384,9 @@ mod tests {
     fn smoke_test() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
+        let arena = prost::Arena::new();
 
-        Config::new()
+        Config::new(&arena)
             .service_generator(Box::new(ServiceTraitGenerator))
             .out_dir(tempdir.path())
             .compile_protos(&["src/fixtures/smoke_test/smoke_test.proto"], &["src"])
@@ -398,8 +400,9 @@ mod tests {
 
         let state = Rc::new(RefCell::new(MockState::default()));
         let generator = MockServiceGenerator::new(Rc::clone(&state));
+        let arena = prost::Arena::new();
 
-        Config::new()
+        Config::new(&arena)
             .service_generator(Box::new(generator))
             .include_file("_protos.rs")
             .out_dir(tempdir.path())
@@ -422,8 +425,9 @@ mod tests {
     fn test_generate_message_attributes() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
+        let arena = prost::Arena::new();
 
-        let mut config = Config::new();
+        let mut config = Config::new(&arena);
         config
             .out_dir(tempdir.path())
             // Add attributes to all messages and enums
@@ -438,9 +442,9 @@ mod tests {
             .unwrap();
 
         // Add custom attributes to messages that are service inputs or outputs.
-        for file in &fds.file {
-            for service in &file.service {
-                for method in &service.method {
+        for file in fds.file {
+            for service in file.service {
+                for method in service.method {
                     if let Some(input) = &method.input_type {
                         config.message_attribute(input, "#[derive(custom_proto::Input)]");
                     }
@@ -467,8 +471,9 @@ mod tests {
         let include_file = "_include.rs";
         let tempdir = tempfile::tempdir().unwrap();
         let previously_empty_proto_path = tempdir.path().join(Path::new("google.protobuf.rs"));
+        let arena = prost::Arena::new();
 
-        Config::new()
+        Config::new(&arena)
             .service_generator(Box::new(generator))
             .include_file(include_file)
             .out_dir(tempdir.path())
@@ -498,8 +503,9 @@ mod tests {
     fn test_generate_field_attributes() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
+        let arena = prost::Arena::new();
 
-        Config::new()
+        Config::new(&arena)
             .out_dir(tempdir.path())
             .boxed("Container.data.foo")
             .boxed("Bar.qux")
@@ -528,8 +534,9 @@ mod tests {
             let generator = MockServiceGenerator::new(Rc::clone(&state));
             let include_file = "_include.rs";
             let tempdir = tempfile::tempdir().unwrap();
+            let arena = prost::Arena::new();
 
-            Config::new()
+            Config::new(&arena)
                 .service_generator(Box::new(generator))
                 .include_file(include_file)
                 .out_dir(tempdir.path())
@@ -571,7 +578,8 @@ mod tests {
             .collect();
 
         let mut buf = Vec::new();
-        Config::new()
+        let arena = prost::Arena::new();
+        Config::new(&arena)
             .default_package_filename("_.default")
             .write_includes(modules.iter().collect(), &mut buf, None, &file_names)
             .unwrap();
@@ -583,8 +591,9 @@ mod tests {
     fn test_generate_deprecated() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
+        let arena = prost::Arena::new();
 
-        Config::new()
+        Config::new(&arena)
             .out_dir(tempdir.path())
             .compile_protos(
                 &["src/fixtures/deprecated/all_deprecated.proto"],

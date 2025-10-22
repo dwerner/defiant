@@ -125,7 +125,7 @@ impl Comments {
 
 /// A service descriptor.
 #[derive(Debug, Clone)]
-pub struct Service {
+pub struct Service<'arena> {
     /// The service name in Rust style.
     pub name: String,
     /// The service name as it appears in the .proto file.
@@ -135,14 +135,14 @@ pub struct Service {
     /// The service comments.
     pub comments: Comments,
     /// The service methods.
-    pub methods: Vec<Method>,
+    pub methods: Vec<Method<'arena>>,
     /// The service options.
-    pub options: prost_types::ServiceOptions,
+    pub options: prost_types::ServiceOptions<'arena>,
 }
 
 /// A service method descriptor.
 #[derive(Debug, Clone)]
-pub struct Method {
+pub struct Method<'arena> {
     /// The name of the method in Rust style.
     pub name: String,
     /// The name of the method as it appears in the .proto file.
@@ -158,7 +158,7 @@ pub struct Method {
     /// The output Protobuf type.
     pub output_proto_type: String,
     /// The method options.
-    pub options: prost_types::MethodOptions,
+    pub options: prost_types::MethodOptions<'arena>,
     /// Identifies if client streams multiple client messages.
     pub client_streaming: bool,
     /// Identifies if server streams multiple server messages.
@@ -432,11 +432,11 @@ mod tests {
 
         for t in tests {
             let loc = Location {
-                path: vec![],
-                span: vec![],
+                path: &[],
+                span: &[],
                 leading_comments: Some(t.input.into()),
                 trailing_comments: None,
-                leading_detached_comments: vec![],
+                leading_detached_comments: &[],
             };
             let comments = Comments::from_location(&loc);
             #[cfg(feature = "cleanup-markdown")]
