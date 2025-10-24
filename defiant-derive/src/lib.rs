@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/prost-derive/0.14.1")]
+#![doc(html_root_url = "https://docs.rs/defiant-derive/0.1.0")]
 // The `quote!` macro requires deep recursion.
 #![recursion_limit = "4096"]
 
@@ -166,6 +166,72 @@ fn nested_message_uses_arena(field_type: &syn::Type) -> bool {
     }
 }
 
+/// Validates that arena message fields don't use disallowed owned types
+/// Returns an error if Box, Vec, String, HashMap, or BTreeMap are found
+fn validate_arena_field_type(field_type: &syn::Type, field_name: &str) -> Result<(), Error> {
+    fn check_type_path(path: &syn::Path, field_name: &str) -> Result<(), Error> {
+        if let Some(last_seg) = path.segments.last() {
+            let type_name = last_seg.ident.to_string();
+
+            // Check for disallowed types
+            match type_name.as_str() {
+                "Box" => bail!(
+                    "Field '{}' uses Box<_> which is not allowed for arena types. \
+                    Use &'arena T instead of Box<&'arena T>",
+                    field_name
+                ),
+                "Vec" => bail!(
+                    "Field '{}' uses Vec<_> which is not allowed for arena types. \
+                    Use &'arena [T] instead of Vec<T>",
+                    field_name
+                ),
+                "String" => bail!(
+                    "Field '{}' uses String which is not allowed for arena types. \
+                    Use &'arena str instead of String",
+                    field_name
+                ),
+                "HashMap" => bail!(
+                    "Field '{}' uses HashMap<_, _> which is not allowed for arena types. \
+                    Use arena-allocated map types instead",
+                    field_name
+                ),
+                "BTreeMap" => bail!(
+                    "Field '{}' uses BTreeMap<_, _> which is not allowed for arena types. \
+                    Use arena-allocated map types instead",
+                    field_name
+                ),
+                _ => {}
+            }
+
+            // Recursively check generic arguments
+            if let syn::PathArguments::AngleBracketed(args) = &last_seg.arguments {
+                for arg in &args.args {
+                    if let syn::GenericArgument::Type(inner_type) = arg {
+                        validate_arena_field_type(inner_type, field_name)?;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    match field_type {
+        syn::Type::Path(type_path) => check_type_path(&type_path.path, field_name)?,
+        syn::Type::Reference(type_ref) => {
+            // Check the referenced type
+            validate_arena_field_type(&type_ref.elem, field_name)?;
+        }
+        syn::Type::Slice(type_slice) => {
+            // Check the element type
+            validate_arena_field_type(&type_slice.elem, field_name)?;
+        }
+        _ => {}
+    }
+
+    Ok(())
+}
+
 fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let input: DeriveInput = syn::parse2(input)?;
     let ident = input.ident;
@@ -221,6 +287,11 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             quote!(#index)
         });
         let field_type = syn_field.ty.clone();
+
+        // Validate that the field doesn't use disallowed types (Box, Vec, String, HashMap, BTreeMap)
+        if let Err(err) = validate_arena_field_type(&field_type, &field_ident.to_string()) {
+            bail!(err.context(format!("invalid field type for {ident}.{field_ident}")));
+        }
 
         match Field::new(syn_field.attrs, Some(next_tag)) {
             Ok(Some(field)) => {
@@ -1292,7 +1363,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
-#[proc_macro_derive(Message, attributes(prost))]
+#[proc_macro_derive(Message, attributes(prost, defiant))]
 pub fn message(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into()).unwrap().into()
 }
@@ -1407,7 +1478,7 @@ fn try_enumeration(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
-#[proc_macro_derive(Enumeration, attributes(prost))]
+#[proc_macro_derive(Enumeration, attributes(prost, defiant))]
 pub fn enumeration(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_enumeration(input.into()).unwrap().into()
 }
@@ -1614,7 +1685,7 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     Ok(expanded)
 }
 
-#[proc_macro_derive(Oneof, attributes(prost))]
+#[proc_macro_derive(Oneof, attributes(prost, defiant))]
 pub fn oneof(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_oneof(input.into()).unwrap().into()
 }
@@ -1637,7 +1708,7 @@ fn prost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
 }
 
 /// Extracts the path to prost specified using the `#[prost(prost_path = "...")]` attribute. When
-/// missing, falls back to default, which is `::prost`.
+/// missing, falls back to default, which is `::defiant`.
 fn get_prost_path(attrs: &[Meta]) -> Result<Path, Error> {
     let mut prost_path = None;
 
@@ -1661,7 +1732,7 @@ fn get_prost_path(attrs: &[Meta]) -> Result<Path, Error> {
     }
 
     let prost_path =
-        prost_path.unwrap_or_else(|| syn::parse_str("::prost").expect("default prost_path"));
+        prost_path.unwrap_or_else(|| syn::parse_str("::defiant").expect("default prost_path"));
 
     Ok(prost_path)
 }
