@@ -8,6 +8,6 @@ authors.workspace = true
 [dependencies]
 bytes = "1"
 env_logger = { version = "0.11", default-features = false }
-prost = { path = "../prost" }
+defiant = { path = "../defiant" }
 protobuf = { path = "../protobuf" }
 tests = { path = "../tests" }

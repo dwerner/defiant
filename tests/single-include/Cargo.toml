@@ -7,8 +7,8 @@ publish = false
 license = "MIT"
 
 [dependencies]
-prost = { path = "../../prost" }
+defiant = { path = "../../defiant" }
 
 [build-dependencies]
-prost = { path = "../../prost" }
-prost-build = { path = "../../prost-build" }
+defiant = { path = "../../defiant" }
+defiant-build = { path = "../../defiant-build" }

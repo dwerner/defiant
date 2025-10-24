@@ -7,10 +7,10 @@ publish = false
 [dependencies]
 
 [build-dependencies]
-prost-build = { path = "../prost-build" }
+defiant-build = { path = "../defiant-build" }
 
 [dev-dependencies]
-prost = { path = "../prost" }
+defiant = { path = "../defiant" }
 criterion = { version = "0.7", default-features = false }
 dhat = "0.3"  # Heap allocation profiler
 

@@ -6,13 +6,13 @@ edition.workspace = true
 authors.workspace = true
 
 [dependencies]
-prost = { path = "../prost" }
-prost-types = { path = "../prost-types" }
+defiant = { path = "../defiant" }
+defiant-types = { path = "../defiant-types" }
 
 [build-dependencies]
 anyhow = "1.0.1"
-prost = { path = "../prost" }
-prost-build = { path = "../prost-build" }
+defiant = { path = "../defiant" }
+defiant-build = { path = "../defiant-build" }
 tempfile = "3"
 cmake = "0.1.51"
 

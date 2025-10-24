@@ -12,7 +12,7 @@ cargo-fuzz = true
 libfuzzer-sys = "0.4"
 tests = { path = "../tests" }
 protobuf = { path = "../protobuf" }
-prost-types = { path = "../prost-types" }
+defiant-types = { path = "../defiant-types" }
 chrono = "0.4"
 
 [[bin]]

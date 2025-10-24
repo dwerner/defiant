@@ -21,16 +21,16 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("edition-2
 [dependencies]
 anyhow = "1.0.1"
 cfg-if = "1"
-prost = { path = "../prost" }
-prost-types = { path = "../prost-types" }
+defiant = { path = "../defiant" }
+defiant-types = { path = "../defiant-types" }
 
 [dev-dependencies]
-prost-build = { path = "../prost-build" }
+defiant-build = { path = "../defiant-build" }
 tempfile = "3"
 protobuf = { path = "../protobuf" }
 
 [build-dependencies]
 cfg-if = "1"
 env_logger = { version = "0.11", default-features = false }
-prost = { path = "../prost" }
-prost-build = { path = "../prost-build" }
+defiant = { path = "../defiant" }
+defiant-build = { path = "../defiant-build" }
