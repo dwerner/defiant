@@ -2,10 +2,10 @@
 //!
 //! This test verifies that the #[derive(Message)] macro generates correct arena-aware code.
 
-use prost::{Arena, Message};
+use defiant::{Arena, Message};
 
 /// A simple Person message using the derive macro
-#[derive(prost_derive::Message)]
+#[derive(defiant_derive::Message)]
 struct PersonDerived<'arena> {
     #[prost(string, tag = "1")]
     name: &'arena str,

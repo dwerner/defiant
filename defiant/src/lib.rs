@@ -2,6 +2,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 #![doc = include_str!("../README.md")]
 
+// Allow tests to use `prost::` imports
+#[doc(hidden)]
+extern crate self as prost;
+
 // Re-export the alloc crate for use within derived code.
 #[doc(hidden)]
 pub extern crate alloc;
@@ -45,6 +49,9 @@ const RECURSION_LIMIT: u32 = 100;
 #[allow(unused_imports)]
 #[macro_use]
 extern crate defiant_derive;
+#[cfg(feature = "derive")]
+#[allow(unused_imports)]
+extern crate defiant_derive as prost_derive;
 #[cfg(feature = "derive")]
 #[doc(hidden)]
 pub use defiant_derive::*;

@@ -1,7 +1,7 @@
 //! Test nested message support
 
-use prost::Arena;
-use prost_derive::Message;
+use defiant::Arena;
+use defiant_derive::Message;
 
 #[derive(Message)]
 struct Address<'arena> {

@@ -1,4 +1,4 @@
-use prost::Message;
+use defiant::Message;
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
@@ -33,7 +33,7 @@ use crate::benchmarks::BenchmarkDataset;
 fn main() {
     // Profile google_message1_proto2 (simple message)
     {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let dataset_bytes = benchmarks::dataset::google_message1_proto2();
         let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
 
@@ -55,7 +55,7 @@ fn main() {
 
     // Profile google_message1_proto3 (simple message, proto3)
     {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let dataset_bytes = benchmarks::dataset::google_message1_proto3();
         let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
 
@@ -77,7 +77,7 @@ fn main() {
 
     // Profile google_message2 (complex nested message)
     {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let dataset_bytes = benchmarks::dataset::google_message2();
         let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
 

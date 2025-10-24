@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use prost::{Arena, Message};
+use defiant::{Arena, Message};
 use rand::Rng;
 
 // Traditional owned message
@@ -13,10 +13,10 @@ impl<'arena> Message<'arena> for MessageOwned {
         Self::default()
     }
 
-    fn encode_raw(&self, buf: &mut impl prost::bytes::BufMut) {
+    fn encode_raw(&self, buf: &mut impl defiant::bytes::BufMut) {
         for (i, value) in self.data.iter().enumerate() {
             if !value.is_empty() {
-                prost::encoding::string::encode((i + 1) as u32, value, buf);
+                defiant::encoding::string::encode((i + 1) as u32, value, buf);
             }
         }
     }
@@ -24,15 +24,15 @@ impl<'arena> Message<'arena> for MessageOwned {
     fn merge_field(
         &mut self,
         tag: u32,
-        wire_type: prost::encoding::wire_type::WireType,
-        buf: &mut impl prost::bytes::Buf,
+        wire_type: defiant::encoding::wire_type::WireType,
+        buf: &mut impl defiant::bytes::Buf,
         _arena: &'arena Arena,
-        ctx: prost::encoding::DecodeContext,
-    ) -> Result<(), prost::DecodeError> {
-        use prost::encoding::{check_wire_type, decode_varint, WireType};
+        ctx: defiant::encoding::DecodeContext,
+    ) -> Result<(), defiant::DecodeError> {
+        use defiant::encoding::{check_wire_type, decode_varint, WireType};
 
         if tag == 0 || tag > 1000 {
-            return prost::encoding::skip_field(wire_type, tag, buf, ctx);
+            return defiant::encoding::skip_field(wire_type, tag, buf, ctx);
         }
 
         check_wire_type(WireType::LengthDelimited, wire_type)?;
@@ -44,7 +44,7 @@ impl<'arena> Message<'arena> for MessageOwned {
             buf.copy_to_slice(value.as_mut_vec());
         }
         if !std::str::from_utf8(value.as_bytes()).is_ok() {
-            return Err(prost::DecodeError::new("invalid UTF-8"));
+            return Err(defiant::DecodeError::new("invalid UTF-8"));
         }
 
         // Ensure vec is large enough
@@ -62,7 +62,7 @@ impl<'arena> Message<'arena> for MessageOwned {
             .enumerate()
             .map(|(i, v)| {
                 if !v.is_empty() {
-                    prost::encoding::string::encoded_len((i + 1) as u32, v)
+                    defiant::encoding::string::encoded_len((i + 1) as u32, v)
                 } else {
                     0
                 }
@@ -88,10 +88,10 @@ impl<'arena> Message<'arena> for MessageArena<'arena> {
         Self::default()
     }
 
-    fn encode_raw(&self, buf: &mut impl prost::bytes::BufMut) {
+    fn encode_raw(&self, buf: &mut impl defiant::bytes::BufMut) {
         for (i, value) in self.data.iter().enumerate() {
             if !value.is_empty() {
-                prost::encoding::string::encode((i + 1) as u32, &value.to_string(), buf);
+                defiant::encoding::string::encode((i + 1) as u32, &value.to_string(), buf);
             }
         }
     }
@@ -99,16 +99,16 @@ impl<'arena> Message<'arena> for MessageArena<'arena> {
     fn merge_field(
         &mut self,
         tag: u32,
-        wire_type: prost::encoding::wire_type::WireType,
-        buf: &mut impl prost::bytes::Buf,
+        wire_type: defiant::encoding::wire_type::WireType,
+        buf: &mut impl defiant::bytes::Buf,
         arena: &'arena Arena,
-        ctx: prost::encoding::DecodeContext,
-    ) -> Result<(), prost::DecodeError> {
+        ctx: defiant::encoding::DecodeContext,
+    ) -> Result<(), defiant::DecodeError> {
         if tag == 0 || tag > 1000 {
-            return prost::encoding::skip_field(wire_type, tag, buf, ctx);
+            return defiant::encoding::skip_field(wire_type, tag, buf, ctx);
         }
 
-        let value = prost::encoding::string::merge_arena(wire_type, buf, arena, ctx)?;
+        let value = defiant::encoding::string::merge_arena(wire_type, buf, arena, ctx)?;
 
         // Ensure vec is large enough
         let idx = (tag - 1) as usize;
@@ -125,7 +125,7 @@ impl<'arena> Message<'arena> for MessageArena<'arena> {
             .enumerate()
             .map(|(i, v)| {
                 if !v.is_empty() {
-                    prost::encoding::string::encoded_len((i + 1) as u32, &v.to_string())
+                    defiant::encoding::string::encoded_len((i + 1) as u32, &v.to_string())
                 } else {
                     0
                 }
@@ -151,8 +151,8 @@ fn create_message_data(target_size: usize) -> Vec<u8> {
         }
 
         // Encode: tag + length + data
-        prost::encoding::encode_key(field_num, prost::encoding::WireType::LengthDelimited, &mut data);
-        prost::encoding::encode_varint(field_size as u64, &mut data);
+        defiant::encoding::encode_key(field_num, defiant::encoding::WireType::LengthDelimited, &mut data);
+        defiant::encoding::encode_varint(field_size as u64, &mut data);
 
         // Generate string data (repeated pattern for simplicity)
         let pattern = format!("field{:03}", field_num);

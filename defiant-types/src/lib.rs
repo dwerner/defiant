@@ -53,10 +53,10 @@ use core::fmt;
 use core::str::FromStr;
 use core::time;
 
-use prost::alloc::format;
-use prost::alloc::string::String;
-use prost::alloc::vec::Vec;
-use prost::{DecodeError, EncodeError, Message, Name};
+use defiant::alloc::format;
+use defiant::alloc::string::String;
+use defiant::alloc::vec::Vec;
+use defiant::{DecodeError, EncodeError, Message, Name};
 
 pub use protobuf::*;
 

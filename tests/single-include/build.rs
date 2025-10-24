@@ -1,7 +1,7 @@
-use prost_build::Config;
+use defiant_build::Config;
 
 fn main() {
-    let arena = prost::Arena::new();
+    let arena = defiant::Arena::new();
 
     Config::new(&arena)
         .include_file("lib.rs")

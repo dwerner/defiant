@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use prost_types::source_code_info::Location;
+use defiant_types::source_code_info::Location;
 #[cfg(feature = "cleanup-markdown")]
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 use regex::Regex;
@@ -137,7 +137,7 @@ pub struct Service<'arena> {
     /// The service methods.
     pub methods: Vec<Method<'arena>>,
     /// The service options.
-    pub options: prost_types::ServiceOptions<'arena>,
+    pub options: defiant_types::ServiceOptions<'arena>,
 }
 
 /// A service method descriptor.
@@ -158,7 +158,7 @@ pub struct Method<'arena> {
     /// The output Protobuf type.
     pub output_proto_type: String,
     /// The method options.
-    pub options: prost_types::MethodOptions<'arena>,
+    pub options: defiant_types::MethodOptions<'arena>,
     /// Identifies if client streams multiple client messages.
     pub client_streaming: bool,
     /// Identifies if server streams multiple server messages.

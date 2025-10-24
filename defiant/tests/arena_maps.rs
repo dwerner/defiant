@@ -20,8 +20,8 @@
 //! repeated MetadataEntry metadata = 2;
 //! ```
 
-use prost::{Arena, DecodeError, Message};
-use prost::encoding::{DecodeContext, WireType, string, int32, message};
+use defiant::{Arena, DecodeError, Message};
+use defiant::encoding::{DecodeContext, WireType, string, int32, message};
 use bytes::{Buf, BufMut};
 
 /// Helper struct for decoding string->string map entries
@@ -66,7 +66,7 @@ impl<'arena> Message<'arena> for StringMapEntry<'arena> {
                 Ok(())
             }
             _ => {
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }
@@ -125,7 +125,7 @@ impl<'arena> Message<'arena> for IntStringMapEntry<'arena> {
                 Ok(())
             }
             _ => {
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }
@@ -183,7 +183,7 @@ impl<'arena> Message<'arena> for UserProfileBuilder {
         match tag {
             1 => {
                 // Inline string decoding for owned String
-                use prost::encoding::{check_wire_type, decode_varint, WireType};
+                use defiant::encoding::{check_wire_type, decode_varint, WireType};
                 check_wire_type(WireType::LengthDelimited, wire_type)?;
                 let len = decode_varint(buf)? as usize;
                 self.username.clear();
@@ -193,7 +193,7 @@ impl<'arena> Message<'arena> for UserProfileBuilder {
                     buf.copy_to_slice(self.username.as_mut_vec());
                 }
                 if !std::str::from_utf8(self.username.as_bytes()).is_ok() {
-                    return Err(prost::DecodeError::new("invalid UTF-8"));
+                    return Err(defiant::DecodeError::new("invalid UTF-8"));
                 }
                 Ok(())
             }
@@ -216,7 +216,7 @@ impl<'arena> Message<'arena> for UserProfileBuilder {
                 Ok(())
             }
             _ => {
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }

@@ -12,7 +12,7 @@ fn type_can_be_constructed() {
 
     let _msg = Msg {
         a: 1,
-        b: "test".to_string(),
+        b: "test",
         timestamp: Some(Timestamp {
             nanos: 3,
             seconds: 3,

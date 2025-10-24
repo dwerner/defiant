@@ -1,4 +1,4 @@
-use prost::{Arena, Message};
+use defiant::{Arena, Message};
 
 #[derive(Clone, PartialEq, Message)]
 pub struct Outer<'arena> {
@@ -14,7 +14,7 @@ pub struct InnerGroup<'arena> {
 
 #[test]
 fn test_nested_group() {
-    use prost::MessageView;
+    use defiant::MessageView;
 
     let arena = Arena::new();
     // Create builder, then freeze to get view

@@ -22,7 +22,7 @@ pub mod generated_include {
 
 #[test]
 fn test() {
-    use prost::Message;
+    use defiant::Message;
 
     let mut widget_factory = widget::factory::WidgetFactory::default();
     assert_eq!(0, widget_factory.encoded_len());
@@ -51,7 +51,7 @@ fn test() {
 
 #[test]
 fn generated_include() {
-    use prost::Message;
+    use defiant::Message;
 
     let mut widget_factory = generated_include::widget::factory::WidgetFactory::default();
     assert_eq!(0, widget_factory.encoded_len());

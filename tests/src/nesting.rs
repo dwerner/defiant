@@ -2,7 +2,7 @@ use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use prost::Message;
+use defiant::Message;
 
 include!(concat!(env!("OUT_DIR"), "/nesting.rs"));
 
@@ -20,7 +20,7 @@ fn test_nesting() {
 
 #[test]
 fn test_deep_nesting() {
-    fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+    fn build_and_roundtrip(depth: usize) -> Result<(), defiant::DecodeError> {
         let mut a = Box::<A>::default();
         for _ in 0..depth {
             let mut next = Box::<A>::default();
@@ -39,7 +39,7 @@ fn test_deep_nesting() {
 
 #[test]
 fn test_deep_nesting_repeated() {
-    fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+    fn build_and_roundtrip(depth: usize) -> Result<(), defiant::DecodeError> {
         let mut c = C::default();
         for _ in 0..depth {
             let mut next = C::default();
@@ -58,7 +58,7 @@ fn test_deep_nesting_repeated() {
 
 #[test]
 fn test_deep_nesting_map() {
-    fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+    fn build_and_roundtrip(depth: usize) -> Result<(), defiant::DecodeError> {
         let mut d = D::default();
         for _ in 0..depth {
             let mut next = D::default();

@@ -1,9 +1,9 @@
-use prost::alloc::vec;
+use defiant::alloc::vec;
 #[cfg(not(feature = "std"))]
-use prost::alloc::{borrow::ToOwned, string::String, vec::Vec};
+use defiant::alloc::{borrow::ToOwned, string::String, vec::Vec};
 
-use prost::bytes::Bytes;
-use prost::{Enumeration, Message, Oneof};
+use defiant::bytes::Bytes;
+use defiant::{Enumeration, Message, Oneof};
 
 use crate::check_message;
 use crate::check_serialize_equivalent;

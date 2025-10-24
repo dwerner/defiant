@@ -1,7 +1,7 @@
 //! Demonstration of the arena-based Message API
 
-use prost::{Arena, MessageView};
-use prost_derive::Message;
+use defiant::{Arena, MessageView};
+use defiant_derive::Message;
 
 #[derive(Message)]
 struct Person<'arena> {

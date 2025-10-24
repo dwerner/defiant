@@ -1,4 +1,4 @@
-use prost::Name;
+use defiant::Name;
 
 include!(concat!(env!("OUT_DIR"), "/type_names.rs"));
 

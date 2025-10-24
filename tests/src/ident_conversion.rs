@@ -1,7 +1,7 @@
 use crate::roundtrip;
 use alloc::collections::BTreeMap;
 use alloc::vec::Vec;
-use prost::Message;
+use defiant::Message;
 
 pub mod bar_baz {
     include!(concat!(env!("OUT_DIR"), "/ident_conversion.bar_baz.rs"));

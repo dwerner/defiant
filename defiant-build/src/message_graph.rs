@@ -4,7 +4,7 @@ use petgraph::algo::has_path_connecting;
 use petgraph::graph::NodeIndex;
 use petgraph::Graph;
 
-use prost_types::{
+use defiant_types::{
     field_descriptor_proto::{Label, Type},
     DescriptorProto, FileDescriptorProto,
 };
@@ -74,7 +74,7 @@ impl<'arena> MessageGraph<'arena> {
     }
 
     /// Try get a message descriptor from current message graph
-    pub fn get_message(&self, message: &str) -> Option<&DescriptorProto> {
+    pub fn get_message(&self, message: &str) -> Option<&DescriptorProto<'_>> {
         self.messages.get(message)
     }
 

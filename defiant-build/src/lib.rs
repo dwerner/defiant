@@ -50,7 +50,7 @@
 //! ```rust,no_run
 //! use std::io::Result;
 //! fn main() -> Result<()> {
-//!     prost_build::compile_protos(&["src/items.proto"], &["src/"])?;
+//!     defiant_build::compile_protos(&["src/items.proto"], &["src/"])?;
 //!     Ok(())
 //! }
 //! ```
@@ -137,7 +137,7 @@
 use std::io::Result;
 use std::path::Path;
 
-use prost_types::FileDescriptorSet;
+use defiant_types::FileDescriptorSet;
 
 mod ast;
 pub use crate::ast::{Comments, Method, Service};
@@ -238,7 +238,7 @@ pub trait ServiceGenerator {
 /// ```rust,no_run
 /// # use std::io::Result;
 /// fn main() -> Result<()> {
-///   prost_build::compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
+///   defiant_build::compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
 ///   Ok(())
 /// }
 /// ```
@@ -248,7 +248,7 @@ pub trait ServiceGenerator {
 /// [3]: https://protobuf.dev/programming-guides/proto3/#importing
 /// [4]: https://protobuf.dev/programming-guides/proto3/#packages
 pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]) -> Result<()> {
-    let arena = prost::Arena::new();
+    let arena = defiant::Arena::new();
     Config::new(&arena).compile_protos(protos, includes)
 }
 
@@ -264,20 +264,20 @@ pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]
 ///
 /// # Example
 /// ```rust,no_run
-/// # use prost_types::FileDescriptorSet;
-/// # fn fds<'arena>(arena: &'arena prost::Arena) -> FileDescriptorSet<'arena> { todo!() }
+/// # use defiant_types::FileDescriptorSet;
+/// # fn fds<'arena>(arena: &'arena defiant::Arena) -> FileDescriptorSet<'arena> { todo!() }
 /// fn main() -> std::io::Result<()> {
-///   let arena = prost::Arena::new();
+///   let arena = defiant::Arena::new();
 ///   let file_descriptor_set = fds(&arena);
 ///
-///   prost_build::compile_fds(&arena, file_descriptor_set)
+///   defiant_build::compile_fds(&arena, file_descriptor_set)
 /// }
 /// ```
 ///
 /// [`protox`]: https://github.com/andrewhickman/protox
 /// [1]: https://doc.rust-lang.org/std/macro.include.html
 /// [2]: https://doc.rust-lang.org/cargo/reference/build-script-examples.html
-pub fn compile_fds<'arena>(arena: &'arena prost::Arena, fds: FileDescriptorSet<'arena>) -> Result<()> {
+pub fn compile_fds<'arena>(arena: &'arena defiant::Arena, fds: FileDescriptorSet<'arena>) -> Result<()> {
     Config::new(arena).compile_fds(fds)
 }
 
@@ -385,7 +385,7 @@ mod tests {
     fn smoke_test() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
 
         Config::new(&arena)
             .service_generator(Box::new(ServiceTraitGenerator))
@@ -401,7 +401,7 @@ mod tests {
 
         let state = Rc::new(RefCell::new(MockState::default()));
         let generator = MockServiceGenerator::new(Rc::clone(&state));
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
 
         Config::new(&arena)
             .service_generator(Box::new(generator))
@@ -426,7 +426,7 @@ mod tests {
     fn test_generate_message_attributes() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
 
         let mut config = Config::new(&arena);
         config
@@ -472,7 +472,7 @@ mod tests {
         let include_file = "_include.rs";
         let tempdir = tempfile::tempdir().unwrap();
         let previously_empty_proto_path = tempdir.path().join(Path::new("google.protobuf.rs"));
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
 
         Config::new(&arena)
             .service_generator(Box::new(generator))
@@ -504,7 +504,7 @@ mod tests {
     fn test_generate_field_attributes() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
 
         Config::new(&arena)
             .out_dir(tempdir.path())
@@ -535,7 +535,7 @@ mod tests {
             let generator = MockServiceGenerator::new(Rc::clone(&state));
             let include_file = "_include.rs";
             let tempdir = tempfile::tempdir().unwrap();
-            let arena = prost::Arena::new();
+            let arena = defiant::Arena::new();
 
             Config::new(&arena)
                 .service_generator(Box::new(generator))
@@ -579,7 +579,7 @@ mod tests {
             .collect();
 
         let mut buf = Vec::new();
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         Config::new(&arena)
             .default_package_filename("_.default")
             .write_includes(modules.iter().collect(), &mut buf, None, &file_names)
@@ -592,7 +592,7 @@ mod tests {
     fn test_generate_deprecated() {
         let _ = env_logger::try_init();
         let tempdir = tempfile::tempdir().unwrap();
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
 
         Config::new(&arena)
             .out_dir(tempdir.path())

@@ -1,5 +1,5 @@
 use super::*;
-use prost::Arena;
+use defiant::Arena;
 
 impl<'arena> Any<'arena> {
     /// Serialize the given message type `M` as [`Any`].

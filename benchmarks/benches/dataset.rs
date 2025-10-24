@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use prost::{Arena, Message};
+use defiant::{Arena, Message};
 use std::error::Error;
 
 pub mod benchmarks {

@@ -13,10 +13,10 @@ pub(crate) enum MapType {
 #[non_exhaustive]
 #[derive(Default, Clone, Copy, Debug, PartialEq)]
 pub(crate) enum BytesType {
-    /// The [`prost::alloc::vec::Vec<u8>`] type.
+    /// The [`defiant::alloc::vec::Vec<u8>`] type.
     #[default]
     Vec,
-    /// The [`bytes::Bytes`](prost::bytes::Bytes) type.
+    /// The [`bytes::Bytes`](defiant::bytes::Bytes) type.
     Bytes,
 }
 
@@ -33,7 +33,7 @@ impl MapType {
     pub fn rust_type(&self) -> &'static str {
         match self {
             MapType::HashMap => "::std::collections::HashMap",
-            MapType::BTreeMap => "::prost::alloc::collections::BTreeMap",
+            MapType::BTreeMap => "::defiant::alloc::collections::BTreeMap",
         }
     }
 }

@@ -10,17 +10,17 @@ cfg_if! {
     if #[cfg(feature = "edition-2015")] {
         extern crate anyhow;
         extern crate core;
-        pub extern crate prost;
-        extern crate prost_types;
+        pub extern crate defiant;
+        extern crate defiant_types;
         extern crate protobuf;
         #[cfg(test)]
-        extern crate prost_build;
+        extern crate defiant_build;
         #[cfg(test)]
         extern crate tempfile;
     }
 }
 
-pub use prost as reexported_prost;
+pub use defiant as reexported_prost;
 
 pub mod decode_error;
 pub mod extern_paths;
@@ -114,16 +114,16 @@ use core::fmt::Debug;
 use alloc::vec::Vec;
 
 use anyhow::anyhow;
-use prost::bytes::Buf;
+use defiant::bytes::Buf;
 
-use prost::Message;
+use defiant::Message;
 
 pub enum RoundtripResult {
     /// The roundtrip succeeded.
     Ok(Vec<u8>),
     /// The data could not be decoded. This could indicate a bug in prost,
     /// or it could indicate that the input was bogus.
-    DecodeError(prost::DecodeError),
+    DecodeError(defiant::DecodeError),
     /// Re-encoding or validating the data failed.  This indicates a bug in `prost`.
     Error(anyhow::Error),
 }
@@ -141,7 +141,7 @@ impl RoundtripResult {
     }
 
     /// Unwrap the roundtrip result. Panics if the result was a validation or re-encoding error.
-    pub fn unwrap_error(self) -> Result<Vec<u8>, prost::DecodeError> {
+    pub fn unwrap_error(self) -> Result<Vec<u8>, defiant::DecodeError> {
         match self {
             RoundtripResult::Ok(buf) => Ok(buf),
             RoundtripResult::DecodeError(error) => Err(error),
@@ -152,7 +152,7 @@ impl RoundtripResult {
 
 /// Tests round-tripping a message type. The message should be compiled with `BTreeMap` fields,
 /// otherwise the comparison may fail due to inconsistent `HashMap` entry encoding ordering.
-pub fn roundtrip<'arena, M>(data: &[u8], arena: &'arena prost::Arena) -> RoundtripResult
+pub fn roundtrip<'arena, M>(data: &[u8], arena: &'arena defiant::Arena) -> RoundtripResult
 where
     M: Message<'arena>,
 {
@@ -214,7 +214,7 @@ where
 }
 
 /// Generic roundtrip serialization check for messages.
-pub fn check_message<'arena, M>(msg: &M, arena: &'arena prost::Arena)
+pub fn check_message<'arena, M>(msg: &M, arena: &'arena defiant::Arena)
 where
     M: Debug + Message<'arena> + PartialEq,
 {
@@ -314,6 +314,6 @@ mod tests {
     fn test_file_descriptor_set_path() {
         let file_descriptor_set_bytes =
             include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
-        prost_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..]).unwrap();
+        defiant_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..]).unwrap();
     }
 }

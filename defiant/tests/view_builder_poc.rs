@@ -1,6 +1,6 @@
 //! Proof of concept for View + Builder (Message) pattern
 
-use prost::Arena;
+use defiant::Arena;
 
 // User's struct - the View (immutable)
 struct Person<'arena> {

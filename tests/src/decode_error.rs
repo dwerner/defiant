@@ -1,7 +1,7 @@
 #![cfg(test)]
 
 use alloc::{boxed::Box, string::ToString, vec::Vec};
-use prost::Message;
+use defiant::Message;
 use protobuf::test_messages::proto3::TestAllTypesProto3;
 
 #[test]
@@ -98,9 +98,9 @@ fn test_decode_error_invalid_tag() {
 fn test_decode_error_unexpected_wire_type() {
     let mut buf = [0x00].as_slice();
     let mut msg = TestAllTypesProto3::default();
-    let ctx = prost::encoding::DecodeContext::default();
+    let ctx = defiant::encoding::DecodeContext::default();
     assert_eq!(
-        msg.merge_field(1, prost::encoding::WireType::LengthDelimited, &mut buf, ctx).unwrap_err().to_string(),
+        msg.merge_field(1, defiant::encoding::WireType::LengthDelimited, &mut buf, ctx).unwrap_err().to_string(),
         "failed to decode Protobuf message: TestAllTypesProto3.optional_int32: invalid wire type: LengthDelimited (expected Varint)"
     );
 }
@@ -136,7 +136,7 @@ fn test_decode_error_invalid_string() {
 
 #[test]
 fn test_decode_error_any() {
-    use prost_types::{Any, Timestamp};
+    use defiant_types::{Any, Timestamp};
 
     let msg = Any {
         type_url: "non-existing-url".to_string(),

@@ -11,9 +11,9 @@
 //! }
 //! ```
 
-use prost::{Arena, DecodeError, Message};
-use prost::encoding::{DecodeContext, WireType, string, int32};
-use prost::encoding::bytes as bytes_encoding;
+use defiant::{Arena, DecodeError, Message};
+use defiant::encoding::{DecodeContext, WireType, string, int32};
+use defiant::encoding::bytes as bytes_encoding;
 use bytes::{Buf, BufMut};
 
 /// Builder struct using regular Vec for accumulation during decoding
@@ -74,7 +74,7 @@ impl<'arena> Message<'arena> for PersonListBuilder {
             }
             _ => {
                 // Skip unknown fields
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }

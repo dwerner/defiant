@@ -1,6 +1,6 @@
 //! Test to see what the derive macro generates
 
-use prost_derive::Message;
+use defiant_derive::Message;
 
 #[derive(Message)]
 struct SimplePerson<'arena> {
@@ -22,7 +22,7 @@ struct PersonWithRepeated<'arena> {
 
 #[test]
 fn test_message_struct_generated() {
-    use prost::{Arena, MessageView};
+    use defiant::{Arena, MessageView};
 
     let arena = Arena::new();
 

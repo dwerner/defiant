@@ -10,8 +10,8 @@
 //! }
 //! ```
 
-use prost::{Arena, DecodeError, Message};
-use prost::encoding::{DecodeContext, WireType, string, int32};
+use defiant::{Arena, DecodeError, Message};
+use defiant::encoding::{DecodeContext, WireType, string, int32};
 use bytes::{Buf, BufMut};
 
 /// A simple Person message with arena-allocated fields.
@@ -69,7 +69,7 @@ impl<'arena> Message<'arena> for Person<'arena> {
             }
             _ => {
                 // Skip unknown fields
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }

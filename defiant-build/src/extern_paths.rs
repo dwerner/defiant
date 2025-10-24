@@ -169,11 +169,11 @@ mod tests {
             assert_eq!(paths.resolve_ident(proto_ident).unwrap(), resolved_ident);
         };
 
-        case(".google.protobuf.Value", "::prost_types::Value");
-        case(".google.protobuf.Duration", "::prost_types::Duration");
+        case(".google.protobuf.Value", "::defiant_types::Value");
+        case(".google.protobuf.Duration", "::defiant_types::Duration");
         case(
             ".google.protobuf.BytesValue",
-            "::prost::alloc::vec::Vec<u8>",
+            "::defiant::alloc::vec::Vec<u8>",
         );
         case(".google.protobuf.Empty", "()");
     }
@@ -192,14 +192,14 @@ mod tests {
             assert_eq!(paths.resolve_ident(proto_ident).unwrap(), resolved_ident);
         };
 
-        case(".google.protobuf.Value", "::some_crate::prost_types::Value");
+        case(".google.protobuf.Value", "::some_crate::defiant_types::Value");
         case(
             ".google.protobuf.Duration",
-            "::some_crate::prost_types::Duration",
+            "::some_crate::defiant_types::Duration",
         );
         case(
             ".google.protobuf.BytesValue",
-            "::some_crate::prost::alloc::vec::Vec<u8>",
+            "::some_crate::defiant::alloc::vec::Vec<u8>",
         );
         case(".google.protobuf.Empty", "()");
     }

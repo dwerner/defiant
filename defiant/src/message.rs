@@ -24,7 +24,7 @@ use crate::EncodeError;
 /// # Examples
 ///
 /// ```ignore
-/// use prost::{Message, Arena};
+/// use defiant::{Message, Arena};
 ///
 /// let arena = Arena::new();
 /// let msg = MyMessage::decode(bytes, &arena)?;

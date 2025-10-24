@@ -14,7 +14,7 @@ pub fn test_parse_duration(data: &[u8]) {
     };
 
     // parse input as a duration
-    let Ok(duration) = prost_types::Duration::from_str(original_text) else {
+    let Ok(duration) = defiant_types::Duration::from_str(original_text) else {
         if original_text.ends_with("s") {
             assert!(
                 original_text.parse::<f64>().is_err(),

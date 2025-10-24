@@ -144,7 +144,7 @@ impl<'arena, T> core::iter::Extend<T> for ArenaVec<'arena, T> {
 /// # Examples
 ///
 /// ```
-/// use prost::Arena;
+/// use defiant::Arena;
 ///
 /// let arena = Arena::new();
 /// // Decode messages using the arena
@@ -328,7 +328,7 @@ where
 /// # Examples
 ///
 /// ```
-/// use prost::{Arena, ArenaMap};
+/// use defiant::{Arena, ArenaMap};
 ///
 /// let arena = Arena::new();
 /// // During decoding, accumulate entries in a BumpVec and sort before creating the map

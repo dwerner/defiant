@@ -37,7 +37,7 @@ fn bootstrap() {
         .tempdir()
         .unwrap();
 
-    prost_build::Config::new()
+    defiant_build::Config::new()
         .compile_well_known_types()
         .btree_map(["."])
         .type_attribute(

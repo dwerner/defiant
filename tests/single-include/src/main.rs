@@ -1,5 +1,5 @@
 fn main() {
-    let arena = prost::Arena::new();
+    let arena = defiant::Arena::new();
 
     // Use the builder pattern via .builder() on the view type
     let _search_req = {

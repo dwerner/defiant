@@ -3,7 +3,7 @@ include!(concat!(env!("OUT_DIR"), "/groups.rs"));
 use alloc::boxed::Box;
 use alloc::string::ToString;
 use alloc::vec::Vec;
-use prost::Message;
+use defiant::Message;
 
 use crate::check_message;
 
@@ -86,7 +86,7 @@ fn test_group_oneof() {
 
 #[test]
 fn test_deep_nesting_group() {
-    fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+    fn build_and_roundtrip(depth: usize) -> Result<(), defiant::DecodeError> {
         let mut a = NestedGroup2::default();
         for _ in 0..depth {
             a = NestedGroup2 {

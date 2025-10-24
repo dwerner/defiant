@@ -138,15 +138,15 @@ pub enum DurationError {
     /// [1]: https://protobuf.dev/programming-guides/proto3/#json
     ParseFailure,
 
-    /// Indicates failure to convert a `prost_types::Duration` to a `std::time::Duration` because
+    /// Indicates failure to convert a `defiant_types::Duration` to a `std::time::Duration` because
     /// the duration is negative. The included `std::time::Duration` matches the magnitude of the
-    /// original negative `prost_types::Duration`.
+    /// original negative `defiant_types::Duration`.
     NegativeDuration(time::Duration),
 
-    /// Indicates failure to convert a `std::time::Duration` to a `prost_types::Duration`.
+    /// Indicates failure to convert a `std::time::Duration` to a `defiant_types::Duration`.
     ///
-    /// Converting a `std::time::Duration` to a `prost_types::Duration` fails if the magnitude
-    /// exceeds that representable by `prost_types::Duration`.
+    /// Converting a `std::time::Duration` to a `defiant_types::Duration` fails if the magnitude
+    /// exceeds that representable by `defiant_types::Duration`.
     OutOfRange,
 }
 

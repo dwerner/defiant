@@ -1,7 +1,7 @@
 use std::io::{self, Read, Write};
 
 use bytes::{Buf, BufMut};
-use prost::Message;
+use defiant::Message;
 
 use protobuf::conformance::{
     conformance_request, conformance_response, ConformanceRequest, ConformanceResponse, WireFormat,

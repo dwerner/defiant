@@ -21,8 +21,8 @@
 //! }
 //! ```
 
-use prost::{Arena, DecodeError, Message};
-use prost::encoding::{DecodeContext, WireType, string, int32, message};
+use defiant::{Arena, DecodeError, Message};
+use defiant::encoding::{DecodeContext, WireType, string, int32, message};
 use bytes::{Buf, BufMut};
 
 /// Address message with arena-allocated string fields
@@ -85,7 +85,7 @@ impl<'arena> Message<'arena> for Address<'arena> {
                 int32::merge(wire_type, &mut self.zip, buf, ctx)
             }
             _ => {
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }
@@ -161,7 +161,7 @@ impl<'arena> Message<'arena> for Person<'arena> {
                 Ok(())
             }
             _ => {
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }
@@ -214,7 +214,7 @@ impl<'arena> Message<'arena> for CompanyBuilder {
         match tag {
             1 => {
                 // Inline string decoding for owned String
-                use prost::encoding::{check_wire_type, decode_varint, WireType};
+                use defiant::encoding::{check_wire_type, decode_varint, WireType};
                 check_wire_type(WireType::LengthDelimited, wire_type)?;
                 let len = decode_varint(buf)? as usize;
                 self.name.clear();
@@ -224,7 +224,7 @@ impl<'arena> Message<'arena> for CompanyBuilder {
                     buf.copy_to_slice(self.name.as_mut_vec());
                 }
                 if !std::str::from_utf8(self.name.as_bytes()).is_ok() {
-                    return Err(prost::DecodeError::new("invalid UTF-8"));
+                    return Err(defiant::DecodeError::new("invalid UTF-8"));
                 }
                 Ok(())
             }
@@ -239,7 +239,7 @@ impl<'arena> Message<'arena> for CompanyBuilder {
                 Ok(())
             }
             _ => {
-                prost::encoding::skip_field(wire_type, tag, buf, ctx)
+                defiant::encoding::skip_field(wire_type, tag, buf, ctx)
             }
         }
     }

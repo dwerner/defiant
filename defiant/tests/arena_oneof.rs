@@ -19,8 +19,8 @@
 //! }
 //! ```
 
-use prost::{Arena, DecodeError, Message};
-use prost::encoding::{DecodeContext, WireType, string, int32, message};
+use defiant::{Arena, DecodeError, Message};
+use defiant::encoding::{DecodeContext, WireType, string, int32, message};
 use bytes::{Buf, BufMut};
 
 /// Image message
@@ -77,7 +77,7 @@ impl<'arena> Message<'arena> for Image<'arena> {
             }
             2 => int32::merge(wire_type, &mut self.width, buf, ctx),
             3 => int32::merge(wire_type, &mut self.height, buf, ctx),
-            _ => prost::encoding::skip_field(wire_type, tag, buf, ctx),
+            _ => defiant::encoding::skip_field(wire_type, tag, buf, ctx),
         }
     }
 
@@ -166,7 +166,7 @@ impl<'arena> Message<'arena> for Notification<'arena> {
                 self.payload = Some(Payload::Count(count));
                 Ok(())
             }
-            _ => prost::encoding::skip_field(wire_type, tag, buf, ctx),
+            _ => defiant::encoding::skip_field(wire_type, tag, buf, ctx),
         }
     }
 

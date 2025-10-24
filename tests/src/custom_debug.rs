@@ -16,7 +16,7 @@ impl fmt::Debug for Msg {
 /// A special case with a tuple struct
 #[test]
 fn tuple_struct_custom_debug() {
-    #[derive(Clone, PartialEq, prost::Message)]
+    #[derive(Clone, PartialEq, defiant::Message)]
     #[prost(skip_debug)]
     struct NewType(#[prost(enumeration = "AnEnum", tag = "5")] i32);
     impl fmt::Debug for NewType {
@@ -47,7 +47,7 @@ impl fmt::Debug for OneofWithEnumCustomDebug {
     }
 }
 
-#[derive(Clone, PartialEq, prost::Message)]
+#[derive(Clone, PartialEq, defiant::Message)]
 #[prost(skip_debug)]
 struct MessageWithOneofCustomDebug {
     #[prost(oneof = "OneofWithEnumCustomDebug", tags = "8, 9, 10")]

@@ -14,7 +14,7 @@ fn test_parse_date(data: &[u8]) {
     };
 
     // parse input as a datetime
-    let Ok(timestamp) = prost_types::Timestamp::from_str(original_text) else {
+    let Ok(timestamp) = defiant_types::Timestamp::from_str(original_text) else {
         let chrono_parse = chrono::DateTime::parse_from_rfc3339(original_text);
         assert!(
             chrono_parse.is_err(),

@@ -3,9 +3,9 @@
 //! The tests check against expected output. This may be a bit fragile, but it is likely OK for
 //! actual use.
 
-use prost::alloc::format;
+use defiant::alloc::format;
 #[cfg(not(feature = "std"))]
-use prost::alloc::string::String;
+use defiant::alloc::string::String;
 
 // Borrow some types from other places.
 #[cfg(feature = "std")]
@@ -61,7 +61,7 @@ fn basic() {
 /// A special case with a tuple struct
 #[test]
 fn tuple_struct() {
-    #[derive(Clone, PartialEq, prost::Message)]
+    #[derive(Clone, PartialEq, defiant::Message)]
     struct NewType(#[prost(enumeration = "BasicEnumeration", tag = "5")] i32);
     assert_eq!(
         format!("{:?}", NewType(BasicEnumeration::TWO as i32)),
@@ -80,7 +80,7 @@ pub enum OneofWithEnum {
     Enumeration(i32),
 }
 
-#[derive(Clone, PartialEq, prost::Message)]
+#[derive(Clone, PartialEq, defiant::Message)]
 struct MessageWithOneof {
     #[prost(oneof = "OneofWithEnum", tags = "8, 9, 10")]
     of: Option<OneofWithEnum>,

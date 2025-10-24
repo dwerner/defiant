@@ -1,6 +1,6 @@
 //! Test to reproduce GoogleMessage2 decode error
 
-use prost::{Arena, Message};
+use defiant::{Arena, Message};
 
 pub mod benchmarks {
     include!(concat!(env!("OUT_DIR"), "/benchmarks.rs"));

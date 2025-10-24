@@ -1,6 +1,6 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
-use prost::Message;
+use defiant::Message;
 
 include!(concat!(env!("OUT_DIR"), "/recursive_oneof.rs"));
 
@@ -17,7 +17,7 @@ fn test_recursive_oneof() {
 
 #[test]
 fn test_deep_nesting_oneof() {
-    fn build_and_roundtrip(depth: usize) -> Result<(), prost::DecodeError> {
+    fn build_and_roundtrip(depth: usize) -> Result<(), defiant::DecodeError> {
         let mut a = Box::new(A {
             kind: Some(a::Kind::C(C {})),
         });

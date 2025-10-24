@@ -1,6 +1,6 @@
 //! Test that arena-based messages decode correctly
 
-use prost::{Arena, Message};
+use defiant::{Arena, Message};
 
 #[derive(Debug)]
 struct PersonArena<'arena> {
@@ -26,61 +26,61 @@ impl<'arena> Message<'arena> for PersonArena<'arena> {
         Self::default()
     }
 
-    fn encode_raw(&self, buf: &mut impl prost::bytes::BufMut) {
+    fn encode_raw(&self, buf: &mut impl defiant::bytes::BufMut) {
         if !self.name.is_empty() {
-            prost::encoding::string::encode(1, self.name, buf);
+            defiant::encoding::string::encode(1, self.name, buf);
         }
         if !self.email.is_empty() {
-            prost::encoding::string::encode(2, self.email, buf);
+            defiant::encoding::string::encode(2, self.email, buf);
         }
         if !self.phone.is_empty() {
-            prost::encoding::string::encode(3, self.phone, buf);
+            defiant::encoding::string::encode(3, self.phone, buf);
         }
         if !self.address.is_empty() {
-            prost::encoding::string::encode(4, self.address, buf);
+            defiant::encoding::string::encode(4, self.address, buf);
         }
     }
 
     fn merge_field(
         &mut self,
         tag: u32,
-        wire_type: prost::encoding::wire_type::WireType,
-        buf: &mut impl prost::bytes::Buf,
+        wire_type: defiant::encoding::wire_type::WireType,
+        buf: &mut impl defiant::bytes::Buf,
         arena: &'arena Arena,
-        ctx: prost::encoding::DecodeContext,
-    ) -> Result<(), prost::DecodeError> {
+        ctx: defiant::encoding::DecodeContext,
+    ) -> Result<(), defiant::DecodeError> {
         match tag {
-            1 => prost::encoding::string::merge_arena(wire_type, buf, arena, ctx)
+            1 => defiant::encoding::string::merge_arena(wire_type, buf, arena, ctx)
                 .map(|v| self.name = v),
-            2 => prost::encoding::string::merge_arena(wire_type, buf, arena, ctx)
+            2 => defiant::encoding::string::merge_arena(wire_type, buf, arena, ctx)
                 .map(|v| self.email = v),
-            3 => prost::encoding::string::merge_arena(wire_type, buf, arena, ctx)
+            3 => defiant::encoding::string::merge_arena(wire_type, buf, arena, ctx)
                 .map(|v| self.phone = v),
-            4 => prost::encoding::string::merge_arena(wire_type, buf, arena, ctx)
+            4 => defiant::encoding::string::merge_arena(wire_type, buf, arena, ctx)
                 .map(|v| self.address = v),
-            _ => prost::encoding::skip_field(wire_type, tag, buf, ctx),
+            _ => defiant::encoding::skip_field(wire_type, tag, buf, ctx),
         }
     }
 
     fn encoded_len(&self) -> usize {
         0
             + if !self.name.is_empty() {
-                prost::encoding::string::encoded_len(1, self.name)
+                defiant::encoding::string::encoded_len(1, self.name)
             } else {
                 0
             }
             + if !self.email.is_empty() {
-                prost::encoding::string::encoded_len(2, self.email)
+                defiant::encoding::string::encoded_len(2, self.email)
             } else {
                 0
             }
             + if !self.phone.is_empty() {
-                prost::encoding::string::encoded_len(3, self.phone)
+                defiant::encoding::string::encoded_len(3, self.phone)
             } else {
                 0
             }
             + if !self.address.is_empty() {
-                prost::encoding::string::encoded_len(4, self.address)
+                defiant::encoding::string::encoded_len(4, self.address)
             } else {
                 0
             }

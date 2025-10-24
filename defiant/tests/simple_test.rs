@@ -1,6 +1,6 @@
 //! Simple test without repeated fields
 
-use prost_derive::Message;
+use defiant_derive::Message;
 
 #[derive(Message)]
 struct SimplePerson<'arena> {
@@ -13,7 +13,7 @@ struct SimplePerson<'arena> {
 
 #[test]
 fn test_simple() {
-    use prost::Arena;
+    use defiant::Arena;
 
     let arena = Arena::new();
 

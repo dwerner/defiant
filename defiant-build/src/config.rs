@@ -10,8 +10,8 @@ use std::process::Command;
 use log::debug;
 use log::trace;
 
-use prost::Message;
-use prost_types::{FileDescriptorProto, FileDescriptorSet};
+use defiant::Message;
+use defiant_types::{FileDescriptorProto, FileDescriptorSet};
 
 use crate::code_generator::CodeGenerator;
 use crate::context::Context;
@@ -55,7 +55,7 @@ pub struct Config<'arena> {
     #[cfg(feature = "format")]
     pub(crate) fmt: bool,
     /// Arena for allocating prost-types messages during build
-    pub(crate) arena: &'arena prost::Arena,
+    pub(crate) arena: &'arena defiant::Arena,
 }
 
 impl<'arena> Config<'arena> {
@@ -63,7 +63,7 @@ impl<'arena> Config<'arena> {
     ///
     /// # Arguments
     /// * `arena` - Arena for allocating prost-types messages during code generation
-    pub fn new(arena: &'arena prost::Arena) -> Config<'arena> {
+    pub fn new(arena: &'arena defiant::Arena) -> Config<'arena> {
         Config {
             file_descriptor_set_path: None,
             service_generator: None,
@@ -114,8 +114,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Match a specific field in a message type.
     /// config.btree_map(&[".my_messages.MyMessageType.my_map_field"]);
     ///
@@ -158,7 +158,7 @@ impl<'arena> Config<'arena> {
         self
     }
 
-    /// Configure the code generator to generate Rust [`bytes::Bytes`](prost::bytes::Bytes) fields for Protobuf
+    /// Configure the code generator to generate Rust [`bytes::Bytes`](defiant::bytes::Bytes) fields for Protobuf
     /// [`bytes`][2] type fields.
     ///
     /// # Arguments
@@ -176,8 +176,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Match a specific field in a message type.
     /// config.bytes(&[".my_messages.MyMessageType.my_bytes_field"]);
     ///
@@ -237,8 +237,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Prost renames fields named `in` to `in_`. But if serialized through serde,
     /// // they should as `in`.
     /// config.field_attribute("in", "#[serde(rename = \"in\")]");
@@ -273,8 +273,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Nothing around uses floats, so we can derive real `Eq` in addition to `PartialEq`.
     /// config.type_attribute(".", "#[derive(Eq)]");
     /// // Some messages want to be serializable with serde as well.
@@ -323,8 +323,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Nothing around uses floats, so we can derive real `Eq` in addition to `PartialEq`.
     /// config.message_attribute(".", "#[derive(Eq)]");
     /// // Some messages want to be serializable with serde as well.
@@ -363,8 +363,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Nothing around uses floats, so we can derive real `Eq` in addition to `PartialEq`.
     /// config.enum_attribute(".", "#[derive(Eq)]");
     /// // Some messages want to be serializable with serde as well.
@@ -403,8 +403,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// config.boxed(".my_messages.MyMessageType.my_field");
     /// ```
     pub fn boxed<P>(&mut self, path: P) -> &mut Self
@@ -439,8 +439,8 @@ impl<'arena> Config<'arena> {
     ///
     /// ```rust,no_run
     /// # fn main() -> std::io::Result<()> {
-    /// let arena = prost::Arena::new();
-    /// let mut config = prost_build::Config::new(&arena);
+    /// let arena = defiant::Arena::new();
+    /// let mut config = defiant_build::Config::new(&arena);
     /// config.disable_comments(&["."]);
     /// config.compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
     /// #     Ok(())
@@ -567,8 +567,8 @@ impl<'arena> Config<'arena> {
     /// a type, and the Rust path should correspondingly refer to a Rust module or type.
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Declare the `uuid` Protobuf package and all nested packages and types as externally
     /// // provided by the `uuid` crate.
     /// config.extern_path(".uuid", "::uuid");
@@ -604,8 +604,8 @@ impl<'arena> Config<'arena> {
     /// ```rust, no_run
     /// # use std::env;
     /// # use std::path::PathBuf;
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// config.file_descriptor_set_path(
     ///     PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR environment variable not set"))
     ///         .join("file_descriptor_set.bin"));
@@ -615,8 +615,8 @@ impl<'arena> Config<'arena> {
     ///
     /// ```rust,ignore
     /// let file_descriptor_set_bytes = include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
-    /// let arena = prost::Arena::new();
-    /// let file_descriptor_set = prost_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..], &arena).unwrap();
+    /// let arena = defiant::Arena::new();
+    /// let file_descriptor_set = defiant_types::FileDescriptorSet::decode(&file_descriptor_set_bytes[..], &arena).unwrap();
     /// ```
     pub fn file_descriptor_set_path<P>(&mut self, path: P) -> &mut Self
     where
@@ -633,8 +633,8 @@ impl<'arena> Config<'arena> {
     /// In `build.rs`:
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// config.file_descriptor_set_path("path/from/build/system")
     ///     .skip_protoc_run()
     ///     .compile_protos(&["src/items.proto"], &["src/"]);
@@ -656,8 +656,8 @@ impl<'arena> Config<'arena> {
     /// In `build.rs`:
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// config.file_descriptor_set_path("path/from/build/system")
     ///     .skip_source_info()
     ///     .compile_protos(&["src/items.proto"], &["src/"]);
@@ -721,8 +721,8 @@ impl<'arena> Config<'arena> {
     /// # Examples
     ///
     /// ```rust
-    /// # let arena = prost::Arena::new();
-    /// # let mut config = prost_build::Config::new(&arena);
+    /// # let arena = defiant::Arena::new();
+    /// # let mut config = defiant_build::Config::new(&arena);
     /// // Full type URL of the message `google.profile.Person`,
     /// // will be `type.googleapis.com/google.profile.Person`.
     /// config.type_name_domain(&["."], "type.googleapis.com");
@@ -769,8 +769,8 @@ impl<'arena> Config<'arena> {
     /// ```rust,no_run
     /// # use std::io::Result;
     /// fn main() -> Result<()> {
-    ///   let arena = prost::Arena::new();
-    ///   let mut prost_build = prost_build::Config::new(&arena);
+    ///   let arena = defiant::Arena::new();
+    ///   let mut prost_build = defiant_build::Config::new(&arena);
     ///   // Enable a protoc experimental feature.
     ///   prost_build.protoc_arg("--experimental_allow_proto3_optional");
     ///   prost_build.compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
@@ -795,8 +795,8 @@ impl<'arena> Config<'arena> {
     /// ```rust,no_run
     /// # use std::io::Result;
     /// fn main() -> Result<()> {
-    ///   let arena = prost::Arena::new();
-    ///   let mut prost_build = prost_build::Config::new(&arena);
+    ///   let arena = defiant::Arena::new();
+    ///   let mut prost_build = defiant_build::Config::new(&arena);
     ///   prost_build.protoc_executable("protoc-27.1");
     ///   prost_build.compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
     ///   Ok(())
@@ -863,13 +863,13 @@ impl<'arena> Config<'arena> {
     /// # Example `build.rs`
     ///
     /// ```rust,no_run
-    /// # use prost_types::FileDescriptorSet;
-    /// # fn fds<'arena>(arena: &'arena prost::Arena) -> FileDescriptorSet<'arena> { todo!() }
+    /// # use defiant_types::FileDescriptorSet;
+    /// # fn fds<'arena>(arena: &'arena defiant::Arena) -> FileDescriptorSet<'arena> { todo!() }
     /// fn main() -> std::io::Result<()> {
-    ///   let arena = prost::Arena::new();
+    ///   let arena = defiant::Arena::new();
     ///   let file_descriptor_set = fds(&arena);
     ///
-    ///   prost_build::Config::new(&arena)
+    ///   defiant_build::Config::new(&arena)
     ///     .compile_fds(file_descriptor_set)
     /// }
     /// ```
@@ -942,10 +942,10 @@ impl<'arena> Config<'arena> {
     /// # Example `build.rs`
     ///
     /// ```rust,no_run
-    /// # use prost_types::FileDescriptorSet;
-    /// # use prost_build::Config;
+    /// # use defiant_types::FileDescriptorSet;
+    /// # use defiant_build::Config;
     /// fn main() -> std::io::Result<()> {
-    ///   let arena = prost::Arena::new();
+    ///   let arena = defiant::Arena::new();
     ///   let mut config = Config::new(&arena);
     ///   let file_descriptor_set = config.load_fds(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
     ///
@@ -1063,7 +1063,7 @@ impl<'arena> Config<'arena> {
     /// Compile `.proto` files into Rust files during a Cargo build with additional code generator
     /// configuration options.
     ///
-    /// This method is like the `prost_build::compile_protos` function, with the added ability to
+    /// This method is like the `defiant_build::compile_protos` function, with the added ability to
     /// specify non-default code generation options. See that function for more information about
     /// the arguments and generated outputs.
     ///
@@ -1074,8 +1074,8 @@ impl<'arena> Config<'arena> {
     /// ```rust,no_run
     /// # use std::io::Result;
     /// fn main() -> Result<()> {
-    ///   let arena = prost::Arena::new();
-    ///   let mut prost_build = prost_build::Config::new(&arena);
+    ///   let arena = defiant::Arena::new();
+    ///   let mut prost_build = defiant_build::Config::new(&arena);
     ///   prost_build.btree_map(&["."]);
     ///   prost_build.compile_protos(&["src/frontend.proto", "src/backend.proto"], &["src"])?;
     ///   Ok(())
@@ -1097,11 +1097,11 @@ impl<'arena> Config<'arena> {
     }
 
     pub(crate) fn prost_path_or_default(&self) -> &str {
-        self.prost_path.as_deref().unwrap_or("::prost")
+        self.prost_path.as_deref().unwrap_or("::defiant")
     }
 
     pub(crate) fn prost_types_path_or_default(&self) -> &str {
-        self.prost_types_path.as_deref().unwrap_or("::prost_types")
+        self.prost_types_path.as_deref().unwrap_or("::defiant_types")
     }
 
     pub(crate) fn write_includes(
@@ -1334,7 +1334,7 @@ mod tests {
 
     #[test]
     fn test_error_protoc_not_found() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
         config.protoc_executable("path-does-not-exist");
 
@@ -1344,7 +1344,7 @@ mod tests {
 
     #[test]
     fn test_error_protoc_not_executable() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
         config.protoc_executable("src/lib.rs");
 
@@ -1354,7 +1354,7 @@ mod tests {
 
     #[test]
     fn test_error_incorrect_skip_protoc_run() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
         config.skip_protoc_run();
 
@@ -1367,7 +1367,7 @@ mod tests {
 
     #[test]
     fn test_error_protoc_failed() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
 
         let err = config.load_fds(&[""], &[""]).unwrap_err();
@@ -1379,7 +1379,7 @@ mod tests {
 
     #[test]
     fn test_error_non_existing_file_descriptor_set() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
         config.skip_protoc_run();
         config.file_descriptor_set_path("path-does-not-exist");
@@ -1393,7 +1393,7 @@ mod tests {
 
     #[test]
     fn test_error_text_incorrect_file_descriptor_set() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
         config.skip_protoc_run();
         config.file_descriptor_set_path("src/lib.rs");
@@ -1407,7 +1407,7 @@ mod tests {
 
     #[test]
     fn test_error_unset_out_dir() {
-        let arena = prost::Arena::new();
+        let arena = defiant::Arena::new();
         let mut config = Config::new(&arena);
 
         let fds = FileDescriptorSet { file: &[] };
