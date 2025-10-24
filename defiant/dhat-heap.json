@@ -1,0 +1,18 @@
+{
+"dhatFileVersion": 2,
+"mode": "rust-heap",
+"verb": "Allocated",
+"bklt": true,
+"bkacc": false,
+"tu": "µs",
+"Mtu": "s",
+"tuth": 10,
+"cmd": "/home/dan/Development/en/memory/prost/target/release/deps/message_sizes_alloc-059b03a2fdbf06c7 --bench",
+"pid": 1579149,
+"tg": 0,
+"te": 8664,
+"pps": [],
+"ftbl": [
+"[root]"
+]
+}
