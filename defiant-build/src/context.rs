@@ -1,6 +1,4 @@
-use std::borrow::Cow;
-
-use prost_types::{
+use defiant_types::{
     field_descriptor_proto::{Label, Type},
     FieldDescriptorProto,
 };
@@ -121,66 +119,6 @@ impl<'a, 'arena> Context<'a, 'arena> {
             .get_first_field(fq_message_name, field_name)
             .copied()
             .unwrap_or_default()
-    }
-
-    /// Returns whether the Rust type for this message field needs to be `Box<_>`.
-    ///
-    /// This can be explicitly configured with `Config::boxed`, or necessary
-    /// to prevent an infinitely sized type definition in case when the type of
-    /// a non-repeated message field transitively contains the message itself.
-    pub fn should_box_message_field(
-        &self,
-        fq_message_name: &str,
-        field: &FieldDescriptorProto,
-    ) -> bool {
-        self.should_box_impl(fq_message_name, None, field)
-    }
-
-    /// Returns whether the Rust type for this field in the oneof needs to be `Box<_>`.
-    ///
-    /// This can be explicitly configured with `Config::boxed`, or necessary
-    /// to prevent an infinitely sized type definition in case when the type of
-    /// a non-repeated message field transitively contains the message itself.
-    pub fn should_box_oneof_field(
-        &self,
-        fq_message_name: &str,
-        oneof_name: &str,
-        field: &FieldDescriptorProto,
-    ) -> bool {
-        self.should_box_impl(fq_message_name, Some(oneof_name), field)
-    }
-
-    fn should_box_impl(
-        &self,
-        fq_message_name: &str,
-        oneof: Option<&str>,
-        field: &FieldDescriptorProto,
-    ) -> bool {
-        if field.label() == Label::Repeated {
-            // Repeated field are stored in Vec, therefore it is already heap allocated
-            return false;
-        }
-        let fd_type = field.r#type();
-        if (fd_type == Type::Message || fd_type == Type::Group)
-            && self
-                .message_graph
-                .is_nested(field.type_name(), fq_message_name)
-        {
-            return true;
-        }
-        let config_path = match oneof {
-            None => Cow::Borrowed(fq_message_name),
-            Some(oneof_name) => Cow::Owned(format!("{fq_message_name}.{oneof_name}")),
-        };
-        if self
-            .config
-            .boxed
-            .get_first_field(&config_path, field.name())
-            .is_some()
-        {
-            return true;
-        }
-        false
     }
 
     /// Returns `true` if this message can automatically derive Copy trait.

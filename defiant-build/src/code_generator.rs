@@ -6,9 +6,9 @@ use std::iter;
 use itertools::{Either, Itertools};
 use log::debug;
 use multimap::MultiMap;
-use prost_types::field_descriptor_proto::{Label, Type};
-use prost_types::source_code_info::Location;
-use prost_types::{
+use defiant_types::field_descriptor_proto::{Label, Type};
+use defiant_types::source_code_info::Location;
+use defiant_types::{
     DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, EnumValueOptions,
     FieldDescriptorProto, FieldOptions, FileDescriptorProto, OneofDescriptorProto,
     ServiceDescriptorProto, SourceCodeInfo,
@@ -105,7 +105,7 @@ impl<'arena> OneofField<'arena> {
 }
 
 impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
-    fn config(&self) -> &Config {
+    fn config(&self) -> &Config<'_> {
         self.context.config()
     }
 
@@ -427,16 +427,16 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         let repeated = field.descriptor.label() == Label::Repeated;
         let deprecated = self.deprecated(&field.descriptor);
         let optional = self.optional(&field.descriptor);
-        let boxed = self
-            .context
-            .should_box_message_field(fq_message_name, &field.descriptor);
+        // For arena types, we don't need Box because &'arena T already breaks cycles
+        // let boxed = self
+        //     .context
+        //     .should_box_message_field(fq_message_name, &field.descriptor);
         let ty = self.resolve_type(&field.descriptor, fq_message_name);
 
         debug!(
-            "    field: {:?}, type: {:?}, boxed: {}",
+            "    field: {:?}, type: {:?}",
             field.descriptor.name(),
             ty,
-            boxed
         );
 
         self.append_doc(fq_message_name, Some(field.descriptor.name()));
@@ -480,9 +480,10 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             }
         }
 
-        if boxed {
-            self.buf.push_str(", boxed");
-        }
+        // For arena types, we don't need the boxed attribute
+        // if boxed {
+        //     self.buf.push_str(", boxed");
+        // }
         self.buf.push_str(", tag = \"");
         self.buf.push_str(&field.descriptor.number().to_string());
 
@@ -524,26 +525,26 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.buf.push_str(&field.rust_name());
         self.buf.push_str(": ");
 
-        let prost_path = self.context.prost_path();
-
         if repeated {
             // All repeated fields are arena-allocated slices
             self.buf.push_str("&'arena [");
         } else if optional {
             self.buf.push_str("::core::option::Option<");
         }
-        if boxed {
-            self.buf
-                .push_str(&format!("{prost_path}::alloc::boxed::Box<"));
-        }
-        // For message fields (optional or required), store as &'arena T<'arena> in the arena
-        if type_ == Type::Message && !repeated {
+        // For arena types, we don't need Box because &'arena T already breaks cycles
+        // Boxing was only needed for owned types to prevent infinite-sized types
+        // if boxed {
+        //     self.buf
+        //         .push_str(&format!("{prost_path}::alloc::boxed::Box<"));
+        // }
+        // For message and group fields (optional or required), use &'arena references to arena-stored data
+        if (type_ == Type::Message || type_ == Type::Group) && !repeated {
             self.buf.push_str("&'arena ");
         }
         self.buf.push_str(&ty);
-        if boxed {
-            self.buf.push('>');
-        }
+        // if boxed {
+        //     self.buf.push('>');
+        // }
         if repeated {
             self.buf.push(']');  // Close slice
         } else if optional {
@@ -587,10 +588,11 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         ));
         self.append_field_attributes(fq_message_name, field.descriptor.name());
         self.push_indent();
+        // For arena types, always use ArenaMap (sorted slice wrapper) instead of HashMap/BTreeMap
+        let prost_path = self.context.prost_path();
         self.buf.push_str(&format!(
-            "pub {}: {}<{}, {}>,\n",
+            "pub {}: {prost_path}::ArenaMap<'arena, {}, {}>,\n",
             field.rust_name(),
-            map_type.rust_type(),
             key_ty,
             value_ty
         ));
@@ -713,32 +715,26 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             self.push_indent();
             let ty = self.resolve_type(&field.descriptor, fq_message_name);
 
-            let boxed = self.context.should_box_oneof_field(
-                fq_message_name,
-                oneof.descriptor.name(),
-                &field.descriptor,
-            );
+            // For arena types, we don't need Box because &'arena T already breaks cycles
+            // Boxing was only needed for owned types to prevent infinite-sized types
+            // let boxed = self.context.should_box_oneof_field(
+            //     fq_message_name,
+            //     oneof.descriptor.name(),
+            //     &field.descriptor,
+            // );
 
             debug!(
-                "    oneof: {:?}, type: {:?}, boxed: {}",
+                "    oneof: {:?}, type: {:?}",
                 field.descriptor.name(),
                 ty,
-                boxed
             );
 
-            if boxed {
-                self.buf.push_str(&format!(
-                    "{}(::prost::alloc::boxed::Box<{}>),\n",
-                    to_upper_camel(field.descriptor.name()),
-                    ty
-                ));
-            } else {
-                self.buf.push_str(&format!(
-                    "{}({}),\n",
-                    to_upper_camel(field.descriptor.name()),
-                    ty
-                ));
-            }
+            // No boxing needed for arena-allocated types
+            self.buf.push_str(&format!(
+                "{}({}),\n",
+                to_upper_camel(field.descriptor.name()),
+                ty
+            ));
         }
         self.depth -= 1;
         self.path.pop();
@@ -747,7 +743,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.buf.push_str("}\n");
     }
 
-    fn location(&self) -> Option<&Location> {
+    fn location(&self) -> Option<&Location<'_>> {
         let source_info = self.source_info.as_ref()?;
         // Linear search since we can't pre-sort arena-allocated data
         // Filter to valid paths (len > 0 && len % 2 == 0) as original code did
@@ -969,7 +965,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                     output_type,
                     input_proto_type: input_proto_type.to_string(),
                     output_proto_type: output_proto_type.to_string(),
-                    options: method.options.cloned().unwrap_or(prost_types::MethodOptions {
+                    options: method.options.cloned().unwrap_or(defiant_types::MethodOptions {
                         deprecated: None,
                         idempotency_level: None,
                         uninterpreted_option: &[],
@@ -987,7 +983,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             package: self.package.clone(),
             comments,
             methods,
-            options: service.options.cloned().unwrap_or(prost_types::ServiceOptions {
+            options: service.options.cloned().unwrap_or(defiant_types::ServiceOptions {
                 deprecated: None,
                 uninterpreted_option: &[],
             }),
