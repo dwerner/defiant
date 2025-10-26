@@ -69,7 +69,7 @@ jobs:
           toolchain: ${{ env.clippy_rust_version }}
           components: clippy
       - run: cargo clippy --workspace --exclude protobuf --all-features --tests -- -D warnings
-      - name: enable edition 2024 lints in `prost-derive` macros
+      - name: enable edition 2024 lints in `defiant-derive` macros
         run: sed -i 's/edition = "[0-9]*"/edition = "2024"/' Cargo.toml
       - name: set MSRV to clippy version to enable more lints
         run: sed -i 's/rust-version = "[.0-9]*"/rust-version = "${{ env.clippy_rust_version }}"/' Cargo.toml
@@ -140,7 +140,7 @@ jobs:
       - name: test
         run: cargo test --features arbitrary
       - name: test no-default-features
-        run: cargo test -p prost-build -p prost-derive -p prost-types --no-default-features
+        run: cargo test -p defiant-build -p defiant-derive -p defiant-types --no-default-features
 
   msrv:
     runs-on: ubuntu-latest
@@ -176,7 +176,7 @@ jobs:
   #       uses: model-checking/kani-github-action@v1.1
   #       with:
   #         args: |
-  #           -p prost-types --features chrono
+  #           -p defiant-types --features chrono
   no-std:
     runs-on: ubuntu-latest
     steps:
@@ -191,17 +191,17 @@ jobs:
         uses: baptiste0928/cargo-install@v3
         with:
           crate: cargo-no-std-check
-      - name: prost cargo-no-std-check
-        run: cargo no-std-check --manifest-path prost/Cargo.toml --no-default-features
-      - name: prost-types cargo-no-std-check
-        run: cargo no-std-check --manifest-path prost-types/Cargo.toml --no-default-features
-      # prost-build depends on prost with --no-default-features, but when
-      # prost-build is built through the workspace, prost typically has default
+      - name: defiant cargo-no-std-check
+        run: cargo no-std-check --manifest-path defiant/Cargo.toml --no-default-features
+      - name: defiant-types cargo-no-std-check
+        run: cargo no-std-check --manifest-path defiant-types/Cargo.toml --no-default-features
+      # defiant-build depends on defiant with --no-default-features, but when
+      # defiant-build is built through the workspace, defiant typically has default
       # features enabled due to vagaries in Cargo workspace feature resolution.
-      # This additional check ensures that prost-build does not rely on any of
-      # prost's default features to compile.
-      - name: prost-build check
-        run: cargo check --manifest-path prost-build/Cargo.toml
+      # This additional check ensures that defiant-build does not rely on any of
+      # defiant's default features to compile.
+      - name: defiant-build check
+        run: cargo check --manifest-path defiant-build/Cargo.toml
       - name: tests-no-std cargo-no-std-check
         run: cargo no-std-check --manifest-path tests-no-std/Cargo.toml
 
@@ -217,7 +217,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - name: Verify that Prost version is up to date in README
+      - name: Verify that Defiant version is up to date in README
         run: grep -q "$(sed '/^version = /!d' Cargo.toml | head -n1)" README.md
       - name: Verify that MSRV version is up to date in README
         run: grep -q "supports $(sed -n 's/rust-version = "\(.*\)"/\1/p' Cargo.toml)\." README.md
