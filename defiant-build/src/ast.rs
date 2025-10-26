@@ -1,5 +1,5 @@
-use once_cell::sync::Lazy;
 use defiant_types::source_code_info::Location;
+use once_cell::sync::Lazy;
 #[cfg(feature = "cleanup-markdown")]
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 use regex::Regex;

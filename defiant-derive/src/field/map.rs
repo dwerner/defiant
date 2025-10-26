@@ -79,8 +79,12 @@ impl Field {
             ValueTy::Scalar(scalar::Ty::String) => quote!(""),
             ValueTy::Scalar(scalar::Ty::Bytes(_)) => quote!(&b""[..]),
             ValueTy::Scalar(scalar::Ty::Bool) => quote!(false),
-            ValueTy::Scalar(scalar::Ty::Int32 | scalar::Ty::Sint32 | scalar::Ty::Sfixed32) => quote!(0i32),
-            ValueTy::Scalar(scalar::Ty::Int64 | scalar::Ty::Sint64 | scalar::Ty::Sfixed64) => quote!(0i64),
+            ValueTy::Scalar(scalar::Ty::Int32 | scalar::Ty::Sint32 | scalar::Ty::Sfixed32) => {
+                quote!(0i32)
+            }
+            ValueTy::Scalar(scalar::Ty::Int64 | scalar::Ty::Sint64 | scalar::Ty::Sfixed64) => {
+                quote!(0i64)
+            }
             ValueTy::Scalar(scalar::Ty::Uint32 | scalar::Ty::Fixed32) => quote!(0u32),
             ValueTy::Scalar(scalar::Ty::Uint64 | scalar::Ty::Fixed64) => quote!(0u64),
             ValueTy::Scalar(scalar::Ty::Float) => quote!(0f32),
@@ -179,11 +183,15 @@ impl Field {
         // String keys are &str, need to dereference from &&str to &str
         // Wrap in closures to match the expected signature
         let (ke, kl) = if matches!(self.key_ty, scalar::Ty::String) {
-            (quote!(|tag, key: &&str, buf| #prost_path::encoding::#key_mod::encode(tag, *key, buf)),
-             quote!(|tag, key: &&str| #prost_path::encoding::#key_mod::encoded_len(tag, *key)))
+            (
+                quote!(|tag, key: &&str, buf| #prost_path::encoding::#key_mod::encode(tag, *key, buf)),
+                quote!(|tag, key: &&str| #prost_path::encoding::#key_mod::encoded_len(tag, *key)),
+            )
         } else {
-            (quote!(#prost_path::encoding::#key_mod::encode),
-             quote!(#prost_path::encoding::#key_mod::encoded_len))
+            (
+                quote!(#prost_path::encoding::#key_mod::encode),
+                quote!(#prost_path::encoding::#key_mod::encoded_len),
+            )
         };
         let key_default = self.key_default();
         let module = self.map_ty.module();
@@ -214,18 +222,18 @@ impl Field {
                 // encode functions expect encode(tag, &str, buf) and encode(tag, &[u8], buf)
                 // So we need to dereference: *val to go from &&[u8] -> &[u8]
                 let (ve, vl) = match value_ty {
-                    scalar::Ty::String => {
-                        (quote!(|tag, val: &&str, buf| #prost_path::encoding::#val_mod::encode(tag, *val, buf)),
-                         quote!(|tag, val: &&str| #prost_path::encoding::#val_mod::encoded_len(tag, *val)))
-                    }
-                    scalar::Ty::Bytes(_) => {
-                        (quote!(|tag, val: &&[u8], buf| #prost_path::encoding::#val_mod::encode(tag, *val, buf)),
-                         quote!(|tag, val: &&[u8]| #prost_path::encoding::#val_mod::encoded_len(tag, *val)))
-                    }
-                    _ => {
-                        (quote!(#prost_path::encoding::#val_mod::encode),
-                         quote!(#prost_path::encoding::#val_mod::encoded_len))
-                    }
+                    scalar::Ty::String => (
+                        quote!(|tag, val: &&str, buf| #prost_path::encoding::#val_mod::encode(tag, *val, buf)),
+                        quote!(|tag, val: &&str| #prost_path::encoding::#val_mod::encoded_len(tag, *val)),
+                    ),
+                    scalar::Ty::Bytes(_) => (
+                        quote!(|tag, val: &&[u8], buf| #prost_path::encoding::#val_mod::encode(tag, *val, buf)),
+                        quote!(|tag, val: &&[u8]| #prost_path::encoding::#val_mod::encoded_len(tag, *val)),
+                    ),
+                    _ => (
+                        quote!(#prost_path::encoding::#val_mod::encode),
+                        quote!(#prost_path::encoding::#val_mod::encoded_len),
+                    ),
                 };
                 let val_default = self.value_default();
                 quote! {
@@ -256,7 +264,7 @@ impl Field {
                         buf,
                     );
                 }
-            },
+            }
         }
     }
 
@@ -340,7 +348,7 @@ impl Field {
                 // This is already handled by is_map_with_message_values check in lib.rs.
                 // If we get here, something is wrong with the code generation logic.
                 panic!("Map fields with message values should use custom inline merge code, not field.merge()")
-            },
+            }
         }
     }
 

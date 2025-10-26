@@ -91,7 +91,7 @@ pub trait Encode {
     fn arena_encode<'arena>(&self, arena: &'arena Arena) -> &'arena [u8] {
         let len = self.encoded_len();
         let mut buf = arena.new_vec_with_capacity::<u8>(len);
-        self.encode_raw(&mut buf);  // ArenaVec<u8> implements BufMut!
+        self.encode_raw(&mut buf); // ArenaVec<u8> implements BufMut!
         buf.freeze()
     }
 }
@@ -177,7 +177,11 @@ pub trait Decode<'arena>: Sized + 'arena {
 
     /// Decodes a length-delimited instance of the message from buffer, and
     /// merges it into `self`.
-    fn merge_length_delimited(&mut self, mut buf: impl Buf, arena: &'arena Arena) -> Result<(), DecodeError> {
+    fn merge_length_delimited(
+        &mut self,
+        mut buf: impl Buf,
+        arena: &'arena Arena,
+    ) -> Result<(), DecodeError> {
         message::merge(
             WireType::LengthDelimited,
             self,

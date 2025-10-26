@@ -21,7 +21,9 @@ pub struct MessageGraph<'arena> {
 }
 
 impl<'arena> MessageGraph<'arena> {
-    pub(crate) fn new<'a>(files: impl Iterator<Item = &'a FileDescriptorProto<'arena>>) -> MessageGraph<'arena>
+    pub(crate) fn new<'a>(
+        files: impl Iterator<Item = &'a FileDescriptorProto<'arena>>,
+    ) -> MessageGraph<'arena>
     where
         'arena: 'a,
     {

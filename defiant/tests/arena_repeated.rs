@@ -1,6 +1,6 @@
 //! Test for arena-allocated repeated fields
 
-use defiant::{Arena, Message, Encode};
+use defiant::{Arena, Encode, Message};
 
 /// PersonList with repeated fields
 #[derive(Message)]
@@ -30,7 +30,8 @@ fn test_repeated_fields_basic() {
 
     // Decode
     let decoded = PersonListBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     // Verify
     assert_eq!(decoded.names.len(), 3);
@@ -66,7 +67,8 @@ fn test_repeated_fields_empty() {
 
     // Decode
     let decoded = PersonListBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     // Verify all empty
     assert_eq!(decoded.names.len(), 0);
@@ -88,7 +90,8 @@ fn test_repeated_fields_single_element() {
     let encoded = list.encode_to_vec();
 
     let decoded = PersonListBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.names.len(), 1);
     assert_eq!(decoded.names[0], "Solo");
@@ -119,7 +122,8 @@ fn test_repeated_fields_large() {
     println!("Encoded {} bytes for 1000 items", encoded.len());
 
     let decoded = PersonListBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.names.len(), 1000);
     assert_eq!(decoded.ages.len(), 1000);
@@ -133,7 +137,10 @@ fn test_repeated_fields_large() {
     assert_eq!(decoded.ages[500], 500);
     assert_eq!(decoded.ages[999], 999);
 
-    println!("Arena allocated {} bytes for 1000 items", arena.allocated_bytes());
+    println!(
+        "Arena allocated {} bytes for 1000 items",
+        arena.allocated_bytes()
+    );
 }
 
 #[test]
@@ -150,7 +157,8 @@ fn test_repeated_unicode() {
     let encoded = list.encode_to_vec();
 
     let decoded = PersonListBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.names[0], "田中");
     assert_eq!(decoded.names[1], "José");

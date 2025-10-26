@@ -1,6 +1,6 @@
 //! Test for arena-allocated Person message
 
-use defiant::{Arena, Message, Encode};
+use defiant::{Arena, Encode, Message};
 
 /// A simple Person message with arena-allocated fields.
 #[derive(Message)]
@@ -27,7 +27,8 @@ fn test_person_encode_decode() {
 
     // Decode from bytes
     let decoded = PersonBuilder::decode(&bytes[..], &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     // Verify
     assert_eq!(decoded.name, "Alice");
@@ -41,14 +42,12 @@ fn test_person_default_values() {
     let arena = Arena::new();
 
     // Create a person with default values
-    let person = Person {
-        name: "",
-        age: 0,
-    };
+    let person = Person { name: "", age: 0 };
 
     let bytes = person.encode_to_vec();
     let decoded = PersonBuilder::decode(&bytes[..], &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.name, "");
     assert_eq!(decoded.age, 0);
@@ -66,7 +65,8 @@ fn test_person_unicode() {
 
     let bytes = person.encode_to_vec();
     let decoded = PersonBuilder::decode(&bytes[..], &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.name, "José García-Müller (田中)");
     assert_eq!(decoded.age, 25);

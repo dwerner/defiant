@@ -19,7 +19,7 @@
 //! }
 //! ```
 
-use defiant::{Arena, Message, Oneof, Encode, Decode};
+use defiant::{Arena, Decode, Encode, Message, Oneof};
 
 /// Image message
 #[derive(Clone, PartialEq, Message)]
@@ -62,7 +62,8 @@ fn test_oneof_text() {
     println!("Encoded text variant: {} bytes", encoded.len());
 
     let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     match decoded.payload {
         Some(Payload::Text(text)) => {
@@ -90,7 +91,8 @@ fn test_oneof_image() {
     println!("Encoded image variant: {} bytes", encoded.len());
 
     let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     match decoded.payload {
         Some(Payload::Image(image)) => {
@@ -114,7 +116,8 @@ fn test_oneof_count() {
 
     let encoded = notification.encode_to_vec();
     let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     match decoded.payload {
         Some(Payload::Count(count)) => {
@@ -132,7 +135,8 @@ fn test_oneof_none() {
 
     let encoded = notification.encode_to_vec();
     let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert!(decoded.payload.is_none());
 }
@@ -145,11 +149,12 @@ fn test_oneof_last_wins() {
 
     // Manually construct a message with multiple oneof fields set
     let mut buf = Vec::new();
-    defiant::encoding::string::encode(1, "first", &mut buf);  // text
-    defiant::encoding::int32::encode(3, &100, &mut buf);  // count
+    defiant::encoding::string::encode(1, "first", &mut buf); // text
+    defiant::encoding::int32::encode(3, &100, &mut buf); // count
 
     let decoded = NotificationBuilder::decode(buf.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     // The last field (count) should win
     match decoded.payload {

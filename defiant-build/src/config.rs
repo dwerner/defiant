@@ -1050,12 +1050,13 @@ impl<'arena> Config<'arena> {
                 ),
             )
         })?;
-        let file_descriptor_set = FileDescriptorSet::from_buf(buf.as_slice(), &self.arena).map_err(|error| {
-            Error::new(
-                ErrorKind::InvalidInput,
-                format!("invalid FileDescriptorSet: {error}"),
-            )
-        })?;
+        let file_descriptor_set = FileDescriptorSet::from_buf(buf.as_slice(), &self.arena)
+            .map_err(|error| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("invalid FileDescriptorSet: {error}"),
+                )
+            })?;
 
         Ok(file_descriptor_set)
     }
@@ -1101,7 +1102,9 @@ impl<'arena> Config<'arena> {
     }
 
     pub(crate) fn prost_types_path_or_default(&self) -> &str {
-        self.prost_types_path.as_deref().unwrap_or("::defiant_types")
+        self.prost_types_path
+            .as_deref()
+            .unwrap_or("::defiant_types")
     }
 
     pub(crate) fn write_includes(
@@ -1411,9 +1414,7 @@ mod tests {
         let mut config = Config::new(&arena);
 
         let fds = FileDescriptorSet { file: &[] };
-        let err = config
-            .compile_fds(fds)
-            .unwrap_err();
+        let err = config.compile_fds(fds).unwrap_err();
         assert_eq!(err.to_string(), "OUT_DIR environment variable is not set")
     }
 }

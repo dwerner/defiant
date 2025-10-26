@@ -2,7 +2,7 @@
 //!
 //! This test verifies that the #[derive(Message)] macro generates correct arena-aware code.
 
-use defiant::{Arena, Message, Encode};
+use defiant::{Arena, Encode, Message};
 
 /// A simple Person message using the derive macro
 #[derive(Message)]
@@ -36,7 +36,7 @@ fn test_derive_person_decode() {
 fn test_derive_person_encode() {
     let person = PersonDerived {
         name: "Bob",
-        age: 25
+        age: 25,
     };
 
     let buf = person.encode_to_vec();

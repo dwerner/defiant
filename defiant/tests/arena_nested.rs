@@ -2,7 +2,7 @@
 //!
 //! This test demonstrates nested protobuf messages with arena allocation.
 
-use defiant::{Arena, Message, Encode};
+use defiant::{Arena, Encode, Message};
 
 /// Address message with arena-allocated string fields
 #[derive(Clone, PartialEq, Message)]
@@ -55,7 +55,8 @@ fn test_nested_message_basic() {
 
     // Decode
     let decoded = PersonBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode person").freeze();
+        .expect("Failed to decode person")
+        .freeze();
 
     // Verify
     assert_eq!(decoded.name, "Alice");
@@ -82,7 +83,8 @@ fn test_nested_message_none() {
 
     let encoded = person.encode_to_vec();
     let decoded = PersonBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.name, "Bob");
     assert!(decoded.address.is_none());
@@ -105,7 +107,8 @@ fn test_nested_message_empty() {
 
     let encoded = person.encode_to_vec();
     let decoded = PersonBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.name, "Charlie");
     assert!(decoded.address.is_some());
@@ -120,9 +123,21 @@ fn test_nested_message_empty() {
 fn test_repeated_nested_messages() {
     let arena = Arena::new();
 
-    let addr1 = Address { street: "100 First St", city: "Boston", zip: 2101 };
-    let addr2 = Address { street: "200 Second Ave", city: "New York", zip: 10001 };
-    let addr3 = Address { street: "300 Third Blvd", city: "San Francisco", zip: 94102 };
+    let addr1 = Address {
+        street: "100 First St",
+        city: "Boston",
+        zip: 2101,
+    };
+    let addr2 = Address {
+        street: "200 Second Ave",
+        city: "New York",
+        zip: 10001,
+    };
+    let addr3 = Address {
+        street: "300 Third Blvd",
+        city: "San Francisco",
+        zip: 94102,
+    };
 
     let company = Company {
         name: "Acme Corp",
@@ -130,10 +145,15 @@ fn test_repeated_nested_messages() {
     };
 
     let encoded = company.encode_to_vec();
-    println!("Encoded company with {} locations: {} bytes", 3, encoded.len());
+    println!(
+        "Encoded company with {} locations: {} bytes",
+        3,
+        encoded.len()
+    );
 
     let decoded = CompanyBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.name, "Acme Corp");
     assert_eq!(decoded.locations.len(), 3);
@@ -148,7 +168,10 @@ fn test_repeated_nested_messages() {
     assert_eq!(decoded.locations[2].city, "San Francisco");
     assert_eq!(decoded.locations[2].zip, 94102);
 
-    println!("Arena allocated {} bytes for company with nested messages", arena.allocated_bytes());
+    println!(
+        "Arena allocated {} bytes for company with nested messages",
+        arena.allocated_bytes()
+    );
 }
 
 #[test]
@@ -172,12 +195,16 @@ fn test_deeply_nested() {
 
     for _ in 0..10 {
         let decoded = PersonBuilder::decode(encoded.as_slice(), &arena)
-            .expect("Failed to decode").freeze();
+            .expect("Failed to decode")
+            .freeze();
 
         assert_eq!(decoded.name, "Deep Nester");
         assert!(decoded.address.is_some());
         assert_eq!(decoded.address.unwrap().city, "Nested City");
     }
 
-    println!("Arena allocated {} bytes after 10 decodes", arena.allocated_bytes());
+    println!(
+        "Arena allocated {} bytes after 10 decodes",
+        arena.allocated_bytes()
+    );
 }

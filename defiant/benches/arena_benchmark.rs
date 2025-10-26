@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use defiant::{Arena, Message};
 
 // Traditional owned message
@@ -102,27 +102,23 @@ impl<'arena> Message<'arena> for PersonOwned {
     }
 
     fn encoded_len(&self) -> usize {
-        0
-            + if !self.name.is_empty() {
-                defiant::encoding::string::encoded_len(1, &self.name)
-            } else {
-                0
-            }
-            + if !self.email.is_empty() {
-                defiant::encoding::string::encoded_len(2, &self.email)
-            } else {
-                0
-            }
-            + if !self.phone.is_empty() {
-                defiant::encoding::string::encoded_len(3, &self.phone)
-            } else {
-                0
-            }
-            + if !self.address.is_empty() {
-                defiant::encoding::string::encoded_len(4, &self.address)
-            } else {
-                0
-            }
+        0 + if !self.name.is_empty() {
+            defiant::encoding::string::encoded_len(1, &self.name)
+        } else {
+            0
+        } + if !self.email.is_empty() {
+            defiant::encoding::string::encoded_len(2, &self.email)
+        } else {
+            0
+        } + if !self.phone.is_empty() {
+            defiant::encoding::string::encoded_len(3, &self.phone)
+        } else {
+            0
+        } + if !self.address.is_empty() {
+            defiant::encoding::string::encoded_len(4, &self.address)
+        } else {
+            0
+        }
     }
 }
 
@@ -188,27 +184,23 @@ impl<'arena> Message<'arena> for PersonArena<'arena> {
     }
 
     fn encoded_len(&self) -> usize {
-        0
-            + if !self.name.is_empty() {
-                defiant::encoding::string::encoded_len(1, &self.name.to_string())
-            } else {
-                0
-            }
-            + if !self.email.is_empty() {
-                defiant::encoding::string::encoded_len(2, &self.email.to_string())
-            } else {
-                0
-            }
-            + if !self.phone.is_empty() {
-                defiant::encoding::string::encoded_len(3, &self.phone.to_string())
-            } else {
-                0
-            }
-            + if !self.address.is_empty() {
-                defiant::encoding::string::encoded_len(4, &self.address.to_string())
-            } else {
-                0
-            }
+        0 + if !self.name.is_empty() {
+            defiant::encoding::string::encoded_len(1, &self.name.to_string())
+        } else {
+            0
+        } + if !self.email.is_empty() {
+            defiant::encoding::string::encoded_len(2, &self.email.to_string())
+        } else {
+            0
+        } + if !self.phone.is_empty() {
+            defiant::encoding::string::encoded_len(3, &self.phone.to_string())
+        } else {
+            0
+        } + if !self.address.is_empty() {
+            defiant::encoding::string::encoded_len(4, &self.address.to_string())
+        } else {
+            0
+        }
     }
 }
 

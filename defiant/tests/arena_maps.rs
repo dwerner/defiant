@@ -1,6 +1,6 @@
 //! Test for arena-allocated map fields
 
-use defiant::{Arena, Message, Encode, ArenaMap};
+use defiant::{Arena, ArenaMap, Encode, Message};
 
 /// UserProfile with map fields
 #[derive(Message)]
@@ -17,16 +17,10 @@ struct UserProfile<'arena> {
 fn test_map_basic() {
     let arena = Arena::new();
 
-    let metadata_entries: &[(&str, &str)] = &[
-        ("email", "alice@example.com"),
-        ("role", "admin"),
-    ];
+    let metadata_entries: &[(&str, &str)] = &[("email", "alice@example.com"), ("role", "admin")];
     let metadata = ArenaMap::new(metadata_entries);
 
-    let tags_entries: &[(i32, &str)] = &[
-        (1, "important"),
-        (2, "verified"),
-    ];
+    let tags_entries: &[(i32, &str)] = &[(1, "important"), (2, "verified")];
     let tags = ArenaMap::new(tags_entries);
 
     let profile = UserProfile {
@@ -39,7 +33,8 @@ fn test_map_basic() {
     println!("Encoded {} bytes", encoded.len());
 
     let decoded = UserProfileBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.username, "alice");
     assert_eq!(decoded.metadata.len(), 2);
@@ -69,7 +64,8 @@ fn test_map_empty() {
 
     let encoded = profile.encode_to_vec();
     let decoded = UserProfileBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.username, "bob");
     assert_eq!(decoded.metadata.len(), 0);
@@ -99,7 +95,8 @@ fn test_map_multiple_entries() {
     println!("Encoded {} map entries: {} bytes", 5, encoded.len());
 
     let decoded = UserProfileBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.username, "biguser");
     assert_eq!(decoded.metadata.len(), 5);
@@ -108,18 +105,18 @@ fn test_map_multiple_entries() {
     assert_eq!(decoded.metadata.get(&"email"), Some(&"user@example.com"));
     assert_eq!(decoded.metadata.get(&"role"), Some(&"admin"));
 
-    println!("Arena allocated {} bytes for {} map entries", arena.allocated_bytes(), decoded.metadata.len());
+    println!(
+        "Arena allocated {} bytes for {} map entries",
+        arena.allocated_bytes(),
+        decoded.metadata.len()
+    );
 }
 
 #[test]
 fn test_map_lookup() {
     let arena = Arena::new();
 
-    let metadata_entries: &[(&str, &str)] = &[
-        ("a", "alpha"),
-        ("b", "beta"),
-        ("c", "gamma"),
-    ];
+    let metadata_entries: &[(&str, &str)] = &[("a", "alpha"), ("b", "beta"), ("c", "gamma")];
     let metadata = ArenaMap::new(metadata_entries);
 
     let profile = UserProfile {
@@ -130,7 +127,8 @@ fn test_map_lookup() {
 
     let encoded = profile.encode_to_vec();
     let decoded = UserProfileBuilder::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode").freeze();
+        .expect("Failed to decode")
+        .freeze();
 
     assert_eq!(decoded.metadata.get(&"a"), Some(&"alpha"));
     assert_eq!(decoded.metadata.get(&"b"), Some(&"beta"));

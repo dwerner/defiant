@@ -85,10 +85,15 @@ fn extract_type_path(field_type: &syn::Type) -> syn::Path {
     match field_type {
         // ::core::option::Option<T> or Option<T> → extract T
         // Handles both qualified (::core::option::Option) and unqualified (Option) forms
-        syn::Type::Path(type_path) if type_path.path.segments.last().unwrap().ident == "Option"
-            && (type_path.path.segments.len() == 1  // Unqualified: Option<T>
-                || type_path.path.segments.iter().any(|s| s.ident == "option" || s.ident == "core")) => {  // Qualified: ::core::option::Option<T>
-            if let syn::PathArguments::AngleBracketed(args) = &type_path.path.segments.last().unwrap().arguments {
+        syn::Type::Path(type_path)
+            if type_path.path.segments.last().unwrap().ident == "Option"
+                && (type_path.path.segments.len() == 1  // Unqualified: Option<T>
+                || type_path.path.segments.iter().any(|s| s.ident == "option" || s.ident == "core")) =>
+        {
+            // Qualified: ::core::option::Option<T>
+            if let syn::PathArguments::AngleBracketed(args) =
+                &type_path.path.segments.last().unwrap().arguments
+            {
                 if let Some(syn::GenericArgument::Type(inner_type)) = args.args.first() {
                     return extract_type_path(inner_type);
                 }
@@ -163,7 +168,7 @@ fn nested_message_uses_arena(field_type: &syn::Type) -> bool {
                 _ => false
             }
         }
-        _ => false
+        _ => false,
     }
 }
 
@@ -280,13 +285,17 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     let mut fields_with_types: Vec<(TokenStream, syn::Type, field::Field)> = Vec::new();
 
     for (i, syn_field) in fields.into_iter().enumerate() {
-        let field_ident = syn_field.ident.clone().map(|x| quote!(#x)).unwrap_or_else(|| {
-            let index = Index {
-                index: i as u32,
-                span: Span::call_site(),
-            };
-            quote!(#index)
-        });
+        let field_ident = syn_field
+            .ident
+            .clone()
+            .map(|x| quote!(#x))
+            .unwrap_or_else(|| {
+                let index = Index {
+                    index: i as u32,
+                    span: Span::call_site(),
+                };
+                quote!(#index)
+            });
         let field_type = syn_field.ty.clone();
 
         // Validate that the field doesn't use disallowed types (Box, Vec, String, HashMap, BTreeMap)
@@ -299,7 +308,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 next_tag = field.tags().iter().max().map(|t| t + 1).unwrap_or(next_tag);
                 fields_with_types.push((field_ident, field_type, field));
             }
-            Ok(None) => {},
+            Ok(None) => {}
             Err(err) => {
                 bail!(err.context(format!("invalid message field {ident}.{field_ident}")))
             }
@@ -1263,100 +1272,107 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         });
 
         // Generate getter methods
-        let getter_methods = fields_with_types.iter().map(|(field_ident, field_type, field)| {
-            use crate::field::Field;
+        let getter_methods = fields_with_types
+            .iter()
+            .map(|(field_ident, field_type, field)| {
+                use crate::field::Field;
 
-            // For getters, use the field identifier directly (preserving r# for keywords)
-            let method_name = field_ident.clone();
+                // For getters, use the field identifier directly (preserving r# for keywords)
+                let method_name = field_ident.clone();
 
-            if matches!(field, Field::Map(_)) {
-                // For map fields (ArenaMap<K,V>), return &[(K,V)]
-                if let syn::Type::Path(type_path) = field_type {
-                    if let Some(last_seg) = type_path.path.segments.last() {
-                        if last_seg.ident == "ArenaMap" {
-                            if let syn::PathArguments::AngleBracketed(args) = &last_seg.arguments {
-                                let type_args: Vec<_> = args.args.iter().skip(1).collect();
-                                if type_args.len() == 2 {
-                                    let key_ty = &type_args[0];
-                                    let val_ty = &type_args[1];
-                                    return quote! {
-                                        pub fn #method_name(&self) -> &[(#key_ty, #val_ty)] {
-                                            &self.#field_ident
-                                        }
-                                    };
+                if matches!(field, Field::Map(_)) {
+                    // For map fields (ArenaMap<K,V>), return &[(K,V)]
+                    if let syn::Type::Path(type_path) = field_type {
+                        if let Some(last_seg) = type_path.path.segments.last() {
+                            if last_seg.ident == "ArenaMap" {
+                                if let syn::PathArguments::AngleBracketed(args) =
+                                    &last_seg.arguments
+                                {
+                                    let type_args: Vec<_> = args.args.iter().skip(1).collect();
+                                    if type_args.len() == 2 {
+                                        let key_ty = &type_args[0];
+                                        let val_ty = &type_args[1];
+                                        return quote! {
+                                            pub fn #method_name(&self) -> &[(#key_ty, #val_ty)] {
+                                                &self.#field_ident
+                                            }
+                                        };
+                                    }
                                 }
                             }
                         }
                     }
-                }
-                // Fallback for map
-                quote! {
-                    pub fn #method_name(&self) -> &[_] {
-                        &self.#field_ident
-                    }
-                }
-            } else if field.is_repeated() {
-                // For BumpVec, return slice reference
-                // Extract the element type from &[T] to get T
-                if let syn::Type::Reference(type_ref) = field_type {
-                    if let syn::Type::Slice(type_slice) = &*type_ref.elem {
-                        let elem_type = &type_slice.elem;
-                        return quote! {
-                            pub fn #method_name(&self) -> &[#elem_type] {
-                                &self.#field_ident
-                            }
-                        };
-                    }
-                }
-                // Fallback
-                quote! {
-                    pub fn #method_name(&self) -> &[_] {
-                        &self.#field_ident
-                    }
-                }
-            } else {
-                // For singular fields
-                use crate::field::Field;
-                if matches!(field, Field::Oneof(_)) && needs_arena {
-                    // For oneofs with arena types, return by reference to avoid move errors
+                    // Fallback for map
                     quote! {
-                        pub fn #method_name(&self) -> &#field_type {
+                        pub fn #method_name(&self) -> &[_] {
+                            &self.#field_ident
+                        }
+                    }
+                } else if field.is_repeated() {
+                    // For BumpVec, return slice reference
+                    // Extract the element type from &[T] to get T
+                    if let syn::Type::Reference(type_ref) = field_type {
+                        if let syn::Type::Slice(type_slice) = &*type_ref.elem {
+                            let elem_type = &type_slice.elem;
+                            return quote! {
+                                pub fn #method_name(&self) -> &[#elem_type] {
+                                    &self.#field_ident
+                                }
+                            };
+                        }
+                    }
+                    // Fallback
+                    quote! {
+                        pub fn #method_name(&self) -> &[_] {
                             &self.#field_ident
                         }
                     }
                 } else {
-                    // For Copy types and owned data, return by value
-                    quote! {
-                        pub fn #method_name(&self) -> #field_type {
-                            self.#field_ident
+                    // For singular fields
+                    use crate::field::Field;
+                    if matches!(field, Field::Oneof(_)) && needs_arena {
+                        // For oneofs with arena types, return by reference to avoid move errors
+                        quote! {
+                            pub fn #method_name(&self) -> &#field_type {
+                                &self.#field_ident
+                            }
+                        }
+                    } else {
+                        // For Copy types and owned data, return by value
+                        quote! {
+                            pub fn #method_name(&self) -> #field_type {
+                                self.#field_ident
+                            }
                         }
                     }
                 }
-            }
-        });
+            });
 
         // Generate freeze() method (converts BumpVec to arena slice)
-        let freeze_field_inits: Vec<_> = fields_with_types.iter().map(|(field_ident, _field_type, field)| {
-            use crate::field::Field;
+        let freeze_field_inits: Vec<_> = fields_with_types
+            .iter()
+            .map(|(field_ident, _field_type, field)| {
+                use crate::field::Field;
 
-            if matches!(field, Field::Map(_)) {
-                // For map fields, sort by key and wrap in ArenaMap
-                quote! {
-                    #field_ident: {
-                        let mut entries = self.#field_ident;
-                        entries.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
-                        #prost_path::ArenaMap::new(entries.freeze())
+                if matches!(field, Field::Map(_)) {
+                    // For map fields, sort by key and wrap in ArenaMap
+                    quote! {
+                        #field_ident: {
+                            let mut entries = self.#field_ident;
+                            entries.sort_by(|(k1, _), (k2, _)| k1.cmp(k2));
+                            #prost_path::ArenaMap::new(entries.freeze())
+                        }
                     }
+                } else if field.is_repeated() {
+                    // For all repeated fields (messages, groups, scalars), just freeze the ArenaVec
+                    // Builders store view references, not builders, so no transformation needed
+                    quote!(#field_ident: self.#field_ident.freeze())
+                } else {
+                    // For singular fields, move value
+                    quote!(#field_ident: self.#field_ident)
                 }
-            } else if field.is_repeated() {
-                // For all repeated fields (messages, groups, scalars), just freeze the ArenaVec
-                // Builders store view references, not builders, so no transformation needed
-                quote!(#field_ident: self.#field_ident.freeze())
-            } else {
-                // For singular fields, move value
-                quote!(#field_ident: self.#field_ident)
-            }
-        }).collect();
+            })
+            .collect();
 
         if needs_arena {
             quote! {
@@ -1472,7 +1488,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
     } else {
         quote!()
     };
-
 
     // Generate Encode impl for View types (arena-allocated messages)
     let view_encode_impl = if needs_arena {
@@ -1618,42 +1633,48 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         }).collect();
 
         // Generate default field initializers for new_in
-        let default_field_inits: Vec<_> = fields_with_types.iter().map(|(field_ident, _field_type, field)| {
-            use crate::field::{Field, Label};
+        let default_field_inits: Vec<_> = fields_with_types
+            .iter()
+            .map(|(field_ident, _field_type, field)| {
+                use crate::field::{Field, Label};
 
-            // Message and Group fields don't use Default - initialize appropriately by label
-            match field {
-                Field::Message(_) | Field::Group(_) => {
-                    let label = match field {
-                        Field::Message(mf) => mf.label,
-                        Field::Group(gf) => gf.label,
-                        _ => unreachable!(),
-                    };
-                    match label {
-                        Label::Optional => quote!(#field_ident: ::core::option::Option::None),
-                        Label::Required => {
-                            // Required scalar-only message: create empty instance via Builder
-                            // Extract the Builder type name
-                            let base_path = extract_type_path(_field_type);
-                            let mut builder_path = base_path.clone();
-                            if let Some(last_seg) = builder_path.segments.last_mut() {
-                                let type_name = last_seg.ident.to_string();
-                                last_seg.ident = Ident::new(&format!("{}Builder", type_name), Span::call_site());
+                // Message and Group fields don't use Default - initialize appropriately by label
+                match field {
+                    Field::Message(_) | Field::Group(_) => {
+                        let label = match field {
+                            Field::Message(mf) => mf.label,
+                            Field::Group(gf) => gf.label,
+                            _ => unreachable!(),
+                        };
+                        match label {
+                            Label::Optional => quote!(#field_ident: ::core::option::Option::None),
+                            Label::Required => {
+                                // Required scalar-only message: create empty instance via Builder
+                                // Extract the Builder type name
+                                let base_path = extract_type_path(_field_type);
+                                let mut builder_path = base_path.clone();
+                                if let Some(last_seg) = builder_path.segments.last_mut() {
+                                    let type_name = last_seg.ident.to_string();
+                                    last_seg.ident = Ident::new(
+                                        &format!("{}Builder", type_name),
+                                        Span::call_site(),
+                                    );
+                                }
+                                quote!(#field_ident: #builder_path::new().freeze())
                             }
-                            quote!(#field_ident: #builder_path::new().freeze())
-                        },
-                        Label::Repeated => {
-                            // Repeated shouldn't exist in scalar-only messages
-                            panic!("Repeated fields should not exist in scalar-only messages")
-                        },
+                            Label::Repeated => {
+                                // Repeated shouldn't exist in scalar-only messages
+                                panic!("Repeated fields should not exist in scalar-only messages")
+                            }
+                        }
                     }
-                },
-                _ => {
-                    // Scalars, enums, etc use Default
-                    quote!(#field_ident: ::core::default::Default::default())
+                    _ => {
+                        // Scalars, enums, etc use Default
+                        quote!(#field_ident: ::core::default::Default::default())
+                    }
                 }
-            }
-        }).collect();
+            })
+            .collect();
 
         // For non-arena types (scalar-only), implement both Encode and Decode
         // Also implement Encode for &T so it can be used in Option<&T> fields
@@ -1862,7 +1883,10 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 #[proc_macro_derive(View, attributes(prost, defiant))]
 pub fn view(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     try_message(input.into())
-        .unwrap_or_else(|e| syn::Error::new(Span::call_site(), format!("View derive error: {}", e)).to_compile_error())
+        .unwrap_or_else(|e| {
+            syn::Error::new(Span::call_site(), format!("View derive error: {}", e))
+                .to_compile_error()
+        })
         .into()
 }
 
@@ -2039,7 +2063,9 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
 
     // Oneof variants cannot be oneofs themselves, so it's impossible to have a field with multiple
     // tags.
-    assert!(fields.iter().all(|(_, field, _, _)| field.tags().len() == 1));
+    assert!(fields
+        .iter()
+        .all(|(_, field, _, _)| field.tags().len() == 1));
 
     if let Some(duplicate_tag) = fields
         .iter()
@@ -2059,22 +2085,24 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         use crate::field::{Field, Ty};
         match field {
             Field::Scalar(scalar_field) => matches!(scalar_field.ty, Ty::String | Ty::Bytes(_)),
-            Field::Message(_) => true,  // Messages always use arena
+            Field::Message(_) => true, // Messages always use arena
             _ => false,
         }
     });
 
-    let encode = fields.iter().map(|(variant_ident, field, deprecated, variant_ty)| {
-        // For scalar-only messages stored by value, don't dereference
-        // For arena messages (references), dereference
-        let value_expr = if matches!(variant_ty, syn::Type::Reference(_)) {
-            quote!(*value)  // Dereference for &'arena T
-        } else {
-            quote!(value)   // Use directly for T
-        };
-        let encode = field.encode(&prost_path, value_expr);
-        quote!(#deprecated #ident::#variant_ident(value) => { #encode })
-    });
+    let encode = fields
+        .iter()
+        .map(|(variant_ident, field, deprecated, variant_ty)| {
+            // For scalar-only messages stored by value, don't dereference
+            // For arena messages (references), dereference
+            let value_expr = if matches!(variant_ty, syn::Type::Reference(_)) {
+                quote!(*value) // Dereference for &'arena T
+            } else {
+                quote!(value) // Use directly for T
+            };
+            let encode = field.encode(&prost_path, value_expr);
+            quote!(#deprecated #ident::#variant_ident(value) => { #encode })
+        });
 
     let merge = fields.iter().map(|(variant_ident, field, deprecated, variant_ty)| {
         let tag = field.tags()[0];
@@ -2196,16 +2224,18 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
         }
     });
 
-    let encoded_len = fields.iter().map(|(variant_ident, field, deprecated, variant_ty)| {
-        // For scalar-only messages stored by value, don't dereference
-        let value_expr = if matches!(variant_ty, syn::Type::Reference(_)) {
-            quote!(*value)
-        } else {
-            quote!(value)
-        };
-        let encoded_len = field.encoded_len(&prost_path, value_expr);
-        quote!(#deprecated #ident::#variant_ident(value) => #encoded_len)
-    });
+    let encoded_len = fields
+        .iter()
+        .map(|(variant_ident, field, deprecated, variant_ty)| {
+            // For scalar-only messages stored by value, don't dereference
+            let value_expr = if matches!(variant_ty, syn::Type::Reference(_)) {
+                quote!(*value)
+            } else {
+                quote!(value)
+            };
+            let encoded_len = field.encoded_len(&prost_path, value_expr);
+            quote!(#deprecated #ident::#variant_ident(value) => #encoded_len)
+        });
 
     // Generate merge function signature with optional arena parameter
     let merge_signature = if needs_arena {
@@ -2262,20 +2292,22 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
     let expanded = if skip_debug {
         expanded
     } else {
-        let debug = fields.iter().map(|(variant_ident, field, deprecated, variant_ty)| {
-            let value_expr = if matches!(variant_ty, syn::Type::Reference(_)) {
-                quote!(*value)
-            } else {
-                quote!(value)
-            };
-            let wrapper = field.debug(&prost_path, value_expr);
-            quote!(#deprecated #ident::#variant_ident(value) => {
-                let wrapper = #wrapper;
-                f.debug_tuple(stringify!(#variant_ident))
-                    .field(&wrapper)
-                    .finish()
-            })
-        });
+        let debug = fields
+            .iter()
+            .map(|(variant_ident, field, deprecated, variant_ty)| {
+                let value_expr = if matches!(variant_ty, syn::Type::Reference(_)) {
+                    quote!(*value)
+                } else {
+                    quote!(value)
+                };
+                let wrapper = field.debug(&prost_path, value_expr);
+                quote!(#deprecated #ident::#variant_ident(value) => {
+                    let wrapper = #wrapper;
+                    f.debug_tuple(stringify!(#variant_ident))
+                        .field(&wrapper)
+                        .finish()
+                })
+            });
         quote! {
             #expanded
 

@@ -590,8 +590,8 @@ impl<'arena> TryFrom<DateTime> for Timestamp {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
     use defiant::alloc::format;
+    use proptest::prelude::*;
 
     #[test]
     fn test_min_max() {

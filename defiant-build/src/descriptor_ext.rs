@@ -23,10 +23,14 @@ impl<'arena> FieldDescriptorProtoExt for FieldDescriptorProto<'arena> {
         self.number.unwrap_or(0)
     }
     fn label(&self) -> Label {
-        self.label.and_then(|l| Label::try_from(l).ok()).unwrap_or(Label::Optional)
+        self.label
+            .and_then(|l| Label::try_from(l).ok())
+            .unwrap_or(Label::Optional)
     }
     fn r#type(&self) -> Type {
-        self.r#type.and_then(|t| Type::try_from(t).ok()).unwrap_or(Type::Double)
+        self.r#type
+            .and_then(|t| Type::try_from(t).ok())
+            .unwrap_or(Type::Double)
     }
     fn type_name(&self) -> &str {
         self.type_name.unwrap_or("")

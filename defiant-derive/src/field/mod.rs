@@ -15,8 +15,8 @@ use syn::Path;
 use syn::{Attribute, Expr, ExprLit, Lit, LitBool, LitInt, Meta, MetaNameValue, Token};
 
 // Re-export Ty and ValueTy for use in lib.rs
-pub(crate) use scalar::Ty;
 pub(crate) use map::ValueTy;
+pub(crate) use scalar::Ty;
 
 #[derive(Clone)]
 pub enum Field {
@@ -193,7 +193,7 @@ impl Field {
     pub fn is_repeated(&self) -> bool {
         match *self {
             Field::Scalar(ref scalar) => scalar.is_repeated(),
-            Field::Map(_) => true,  // Maps are encoded as repeated
+            Field::Map(_) => true, // Maps are encoded as repeated
             Field::Message(ref message) => message.label == Label::Repeated,
             Field::Group(ref group) => group.label == Label::Repeated,
             _ => false,

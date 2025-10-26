@@ -112,10 +112,10 @@ impl Field {
         let encode_fn = match self.kind {
             Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => {
                 quote!(encode)
-            },
+            }
             Kind::Repeated => {
                 quote!(encode_repeated)
-            },
+            }
             Kind::Packed => quote!(encode_packed),
         };
         let encode_fn = quote!(#prost_path::encoding::#module::#encode_fn);
@@ -164,7 +164,7 @@ impl Field {
                 quote! {
                     #encode_fn(#tag, #param, buf);
                 }
-            },
+            }
         }
     }
 
@@ -183,14 +183,14 @@ impl Field {
                 } else {
                     quote!(merge)
                 }
-            },
+            }
             Kind::Repeated | Kind::Packed => {
                 if matches!(self.ty, Ty::String | Ty::Bytes(_)) {
                     quote!(merge_repeated_arena)
                 } else {
                     quote!(merge_repeated)
                 }
-            },
+            }
         };
         let merge_fn = quote!(#prost_path::encoding::#module::#merge_fn);
 
@@ -234,10 +234,10 @@ impl Field {
         let encoded_len_fn = match self.kind {
             Kind::Plain(..) | Kind::Optional(..) | Kind::Required(..) => {
                 quote!(encoded_len)
-            },
+            }
             Kind::Repeated => {
                 quote!(encoded_len_repeated)
-            },
+            }
             Kind::Packed => quote!(encoded_len_packed),
         };
         let encoded_len_fn = quote!(#prost_path::encoding::#module::#encoded_len_fn);
@@ -286,7 +286,7 @@ impl Field {
                 quote! {
                     #encoded_len_fn(#tag, #param)
                 }
-            },
+            }
         }
     }
 

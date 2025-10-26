@@ -97,13 +97,13 @@ impl Field {
         match self.label {
             Label::Optional => {
                 panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");
-            },
+            }
             Label::Required => {
                 panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");
-            },
+            }
             Label::Repeated => {
                 panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");
-            },
+            }
         }
     }
 

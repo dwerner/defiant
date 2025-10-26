@@ -110,13 +110,13 @@ impl Field {
                 // This path should NOT be reached anymore - we generate inline builder code
                 // for all message fields in lib.rs. If this is reached, something is wrong.
                 panic!("Message field merge() should not be called - inline builder code should be generated in lib.rs");
-            },
+            }
             Label::Required => {
                 panic!("Message field merge() should not be called - inline builder code should be generated in lib.rs");
-            },
+            }
             Label::Repeated => {
                 panic!("Message field merge() should not be called - inline builder code should be generated in lib.rs");
-            },
+            }
         }
     }
 

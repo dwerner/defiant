@@ -29,7 +29,11 @@ fn demo_builder_pattern() {
     person.push_emails("alice@work.com");
 
     // Inspect state while building using getters
-    println!("Building: name={}, emails={:?}", person.name(), person.emails());
+    println!(
+        "Building: name={}, emails={:?}",
+        person.name(),
+        person.emails()
+    );
 
     // Continue building
     person.push_emails("alice@home.com");

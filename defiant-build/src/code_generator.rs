@@ -3,9 +3,6 @@ use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 use std::iter;
 
-use itertools::{Either, Itertools};
-use log::debug;
-use multimap::MultiMap;
 use defiant_types::field_descriptor_proto::{Label, Type};
 use defiant_types::source_code_info::Location;
 use defiant_types::{
@@ -13,6 +10,9 @@ use defiant_types::{
     FieldDescriptorProto, FieldOptions, FileDescriptorProto, OneofDescriptorProto,
     ServiceDescriptorProto, SourceCodeInfo,
 };
+use itertools::{Either, Itertools};
+use log::debug;
+use multimap::MultiMap;
 
 use crate::ast::{Comments, Method, Service};
 use crate::context::Context;
@@ -111,7 +111,11 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.context.config()
     }
 
-    pub(crate) fn generate(context: &mut Context<'ctx, 'arena>, file: FileDescriptorProto<'arena>, buf: &mut String) {
+    pub(crate) fn generate(
+        context: &mut Context<'ctx, 'arena>,
+        file: FileDescriptorProto<'arena>,
+        buf: &mut String,
+    ) {
         // Use source info as-is from arena (can't filter/sort immutable slice)
         // TODO: Consider pre-sorting at proto parse time or using linear search
         let source_info = file.source_code_info;
@@ -185,7 +189,8 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         // of the map field entry types. The path index of the nested message types is preserved so
         // that comments can be retrieved.
         type NestedTypes<'arena> = Vec<(DescriptorProto<'arena>, usize)>;
-        type MapTypes<'arena> = HashMap<String, (FieldDescriptorProto<'arena>, FieldDescriptorProto<'arena>)>;
+        type MapTypes<'arena> =
+            HashMap<String, (FieldDescriptorProto<'arena>, FieldDescriptorProto<'arena>)>;
         let (nested_types, map_types): (NestedTypes<'arena>, MapTypes<'arena>) = message
             .nested_type
             .iter()
@@ -435,11 +440,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         //     .should_box_message_field(fq_message_name, &field.descriptor);
         let ty = self.resolve_type(&field.descriptor, fq_message_name);
 
-        debug!(
-            "    field: {:?}, type: {:?}",
-            field.descriptor.name(),
-            ty,
-        );
+        debug!("    field: {:?}, type: {:?}", field.descriptor.name(), ty,);
 
         self.append_doc(fq_message_name, Some(field.descriptor.name()));
 
@@ -550,9 +551,9 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         //     self.buf.push('>');
         // }
         if repeated {
-            self.buf.push(']');  // Close slice
+            self.buf.push(']'); // Close slice
         } else if optional {
-            self.buf.push('>');  // Close Option
+            self.buf.push('>'); // Close Option
         }
         self.buf.push_str(",\n");
     }
@@ -611,13 +612,14 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         let type_name = format!("{}::{}", to_snake(message_name), oneof.type_name());
 
         // Check if this oneof needs a lifetime parameter
-        let needs_lifetime = oneof.fields.iter().any(|field| {
-            match field.descriptor.r#type() {
+        let needs_lifetime = oneof
+            .fields
+            .iter()
+            .any(|field| match field.descriptor.r#type() {
                 Type::String | Type::Bytes => true,
                 Type::Message => self.message_type_needs_lifetime(field.descriptor.type_name()),
                 _ => false,
-            }
-        });
+            });
 
         let full_type_name = if needs_lifetime {
             format!("{}<'arena>", type_name)
@@ -679,13 +681,14 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.append_skip_debug(fq_message_name);
 
         // Check if any oneof field needs arena allocation
-        let needs_lifetime = oneof.fields.iter().any(|field| {
-            match field.descriptor.r#type() {
+        let needs_lifetime = oneof
+            .fields
+            .iter()
+            .any(|field| match field.descriptor.r#type() {
                 Type::String | Type::Bytes => true,
                 Type::Message => self.message_type_needs_lifetime(field.descriptor.type_name()),
                 _ => false,
-            }
-        });
+            });
 
         self.push_indent();
         self.buf.push_str("pub enum ");
@@ -727,17 +730,15 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             //     &field.descriptor,
             // );
 
-            debug!(
-                "    oneof: {:?}, type: {:?}",
-                field.descriptor.name(),
-                ty,
-            );
+            debug!("    oneof: {:?}, type: {:?}", field.descriptor.name(), ty,);
 
             // No boxing needed for arena-allocated types
             // For message and group fields that have arena lifetimes, add &'arena reference
             // (same as regular struct fields). Scalar-only messages are owned.
-            let variant_ty = if (field.descriptor.r#type() == Type::Message || field.descriptor.r#type() == Type::Group)
-                && ty.contains("<'arena>") {
+            let variant_ty = if (field.descriptor.r#type() == Type::Message
+                || field.descriptor.r#type() == Type::Group)
+                && ty.contains("<'arena>")
+            {
                 format!("&'arena {}", ty)
             } else {
                 ty
@@ -979,11 +980,14 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                     output_type,
                     input_proto_type: input_proto_type.to_string(),
                     output_proto_type: output_proto_type.to_string(),
-                    options: method.options.cloned().unwrap_or(defiant_types::MethodOptions {
-                        deprecated: None,
-                        idempotency_level: None,
-                        uninterpreted_option: &[],
-                    }),
+                    options: method
+                        .options
+                        .cloned()
+                        .unwrap_or(defiant_types::MethodOptions {
+                            deprecated: None,
+                            idempotency_level: None,
+                            uninterpreted_option: &[],
+                        }),
                     client_streaming,
                     server_streaming,
                 }
@@ -997,10 +1001,13 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             package: self.package.clone(),
             comments,
             methods,
-            options: service.options.cloned().unwrap_or(defiant_types::ServiceOptions {
-                deprecated: None,
-                uninterpreted_option: &[],
-            }),
+            options: service
+                .options
+                .cloned()
+                .unwrap_or(defiant_types::ServiceOptions {
+                    deprecated: None,
+                    uninterpreted_option: &[],
+                }),
         };
 
         if let Some(service_generator) = self.context.service_generator_mut() {
@@ -1051,9 +1058,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                 Type::String | Type::Bytes => true,
                 // Message and Group fields: only require lifetime if the child message has a lifetime
                 // Scalar-only messages are stored by value and don't require a lifetime
-                Type::Message | Type::Group => {
-                    self.message_type_needs_lifetime(field.type_name())
-                }
+                Type::Message | Type::Group => self.message_type_needs_lifetime(field.type_name()),
                 // Scalars (int, float, bool) and enums are stack-only
                 _ => false,
             }
@@ -1066,7 +1071,11 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.message_type_needs_lifetime_impl(type_name, &mut visited)
     }
 
-    fn message_type_needs_lifetime_impl(&self, type_name: &str, visited: &mut HashSet<String>) -> bool {
+    fn message_type_needs_lifetime_impl(
+        &self,
+        type_name: &str,
+        visited: &mut HashSet<String>,
+    ) -> bool {
         // Detect cycles
         if !visited.insert(type_name.to_string()) {
             // If we're in a cycle, conservatively assume it needs a lifetime
@@ -1304,8 +1313,5 @@ fn build_enum_value_mappings<'a, 'arena>(
 }
 
 fn enum_field_deprecated(value: &EnumValueDescriptorProto) -> bool {
-    value
-        .options
-        .as_ref()
-        .is_some_and(|opts| opts.deprecated())
+    value.options.as_ref().is_some_and(|opts| opts.deprecated())
 }

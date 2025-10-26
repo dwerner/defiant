@@ -151,7 +151,11 @@ fn create_message_data(target_size: usize) -> Vec<u8> {
         }
 
         // Encode: tag + length + data
-        defiant::encoding::encode_key(field_num, defiant::encoding::WireType::LengthDelimited, &mut data);
+        defiant::encoding::encode_key(
+            field_num,
+            defiant::encoding::WireType::LengthDelimited,
+            &mut data,
+        );
         defiant::encoding::encode_varint(field_size as u64, &mut data);
 
         // Generate string data (repeated pattern for simplicity)

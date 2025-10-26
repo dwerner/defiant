@@ -195,7 +195,10 @@ mod tests {
             assert_eq!(paths.resolve_ident(proto_ident).unwrap(), resolved_ident);
         };
 
-        case(".google.protobuf.Value", "::some_crate::defiant_types::Value");
+        case(
+            ".google.protobuf.Value",
+            "::some_crate::defiant_types::Value",
+        );
         case(
             ".google.protobuf.Duration",
             "::some_crate::defiant_types::Duration",

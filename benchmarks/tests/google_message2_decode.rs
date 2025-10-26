@@ -16,7 +16,7 @@ pub mod benchmarks {
     }
 }
 
-use benchmarks::{BenchmarkDataset, proto2::GoogleMessage2};
+use benchmarks::{proto2::GoogleMessage2, BenchmarkDataset};
 
 #[test]
 fn test_google_message2_decode() {
@@ -24,8 +24,8 @@ fn test_google_message2_decode() {
     let dataset_bytes = benchmarks::dataset::google_message2();
 
     // First, decode the dataset container
-    let dataset = BenchmarkDataset::decode(dataset_bytes, &arena)
-        .expect("Failed to decode BenchmarkDataset");
+    let dataset =
+        BenchmarkDataset::decode(dataset_bytes, &arena).expect("Failed to decode BenchmarkDataset");
 
     println!("Dataset contains {} messages", dataset.payload.len());
 

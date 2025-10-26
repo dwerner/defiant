@@ -59,7 +59,9 @@ impl<'arena> defiant::ArenaFrom<'arena, Vec<Value<'arena>>> for Value<'arena> {
             vec.push(&*arena.alloc(value));
         }
         let values_slice = vec.freeze();
-        let list_value = arena.alloc(crate::protobuf::ListValue { values: values_slice });
+        let list_value = arena.alloc(crate::protobuf::ListValue {
+            values: values_slice,
+        });
         value::Kind::ListValue(list_value).into()
     }
 }
@@ -74,7 +76,7 @@ impl<'arena> defiant::ArenaFrom<'arena, BTreeMap<String, Value<'arena>>> for Val
         }
         let fields_slice = vec.freeze();
         let struct_value = arena.alloc(crate::protobuf::Struct {
-            fields: defiant::ArenaMap::new(fields_slice)
+            fields: defiant::ArenaMap::new(fields_slice),
         });
         value::Kind::StructValue(struct_value).into()
     }

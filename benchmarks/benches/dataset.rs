@@ -29,7 +29,10 @@ pub mod benchmarks {
 
 use crate::benchmarks::BenchmarkDataset;
 
-fn load_dataset<'arena>(dataset: &[u8], arena: &'arena Arena) -> Result<BenchmarkDataset<'arena>, Box<dyn Error>> {
+fn load_dataset<'arena>(
+    dataset: &[u8],
+    arena: &'arena Arena,
+) -> Result<BenchmarkDataset<'arena>, Box<dyn Error>> {
     Ok(BenchmarkDataset::from_buf(dataset, arena)?)
 }
 
@@ -61,7 +64,8 @@ macro_rules! dataset {
                     .iter()
                     .map(|buf| <$ty>::from_buf(*buf, &arena).unwrap())
                     .collect();
-                let mut buf = Vec::with_capacity(messages.iter().map(|m| m.encoded_len()).sum::<usize>());
+                let mut buf =
+                    Vec::with_capacity(messages.iter().map(|m| m.encoded_len()).sum::<usize>());
                 b.iter(|| {
                     buf.clear();
                     for message in &messages {

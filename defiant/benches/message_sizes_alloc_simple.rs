@@ -147,7 +147,11 @@ fn create_message_data(target_size: usize) -> Vec<u8> {
             break;
         }
 
-        defiant::encoding::encode_key(field_num, defiant::encoding::WireType::LengthDelimited, &mut data);
+        defiant::encoding::encode_key(
+            field_num,
+            defiant::encoding::WireType::LengthDelimited,
+            &mut data,
+        );
         defiant::encoding::encode_varint(field_size as u64, &mut data);
 
         let pattern = format!("field{:03}", field_num);
@@ -182,7 +186,10 @@ fn main() {
             + msg_owned.data.iter().map(|s| s.capacity()).sum::<usize>();
 
         println!("Owned:");
-        println!("  Arena bytes used: {} (should be 0)", after_owned - before_owned);
+        println!(
+            "  Arena bytes used: {} (should be 0)",
+            after_owned - before_owned
+        );
         println!("  Heap bytes (estimated): {}", owned_heap);
         drop(msg_owned);
 
@@ -219,7 +226,10 @@ fn main() {
             total_arena_bytes_owned += after - before;
             drop(msg);
         }
-        println!("Owned (100 iterations, fresh arena each): {} arena bytes total", total_arena_bytes_owned);
+        println!(
+            "Owned (100 iterations, fresh arena each): {} arena bytes total",
+            total_arena_bytes_owned
+        );
 
         // Arena - reused arena
         let mut arena = Arena::with_capacity(size * 2);
@@ -235,11 +245,19 @@ fn main() {
             drop(msg);
         }
 
-        println!("Arena (100 iterations, reused):         {} arena bytes total (initial capacity: {})",
-            total_arena_bytes_reused, initial_capacity);
-        println!("  Savings: {} bytes ({:.1}x)",
+        println!(
+            "Arena (100 iterations, reused):         {} arena bytes total (initial capacity: {})",
+            total_arena_bytes_reused, initial_capacity
+        );
+        println!(
+            "  Savings: {} bytes ({:.1}x)",
             total_arena_bytes_owned.saturating_sub(total_arena_bytes_reused),
-            if total_arena_bytes_reused > 0 { total_arena_bytes_owned as f64 / total_arena_bytes_reused as f64 } else { 0.0 });
+            if total_arena_bytes_reused > 0 {
+                total_arena_bytes_owned as f64 / total_arena_bytes_reused as f64
+            } else {
+                0.0
+            }
+        );
         println!();
     }
 }

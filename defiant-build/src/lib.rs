@@ -278,7 +278,10 @@ pub fn compile_protos(protos: &[impl AsRef<Path>], includes: &[impl AsRef<Path>]
 /// [`protox`]: https://github.com/andrewhickman/protox
 /// [1]: https://doc.rust-lang.org/std/macro.include.html
 /// [2]: https://doc.rust-lang.org/cargo/reference/build-script-examples.html
-pub fn compile_fds<'arena>(arena: &'arena defiant::Arena, fds: FileDescriptorSet<'arena>) -> Result<()> {
+pub fn compile_fds<'arena>(
+    arena: &'arena defiant::Arena,
+    fds: FileDescriptorSet<'arena>,
+) -> Result<()> {
     Config::new(arena).compile_fds(fds)
 }
 

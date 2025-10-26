@@ -1,7 +1,7 @@
 #![no_main]
 
-use libfuzzer_sys::fuzz_target;
 use defiant::Arena;
+use libfuzzer_sys::fuzz_target;
 use protobuf::test_messages::proto3::TestAllTypesProto3;
 use tests::roundtrip;
 

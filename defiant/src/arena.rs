@@ -50,7 +50,7 @@ impl<'arena, T> ArenaVec<'arena, T> {
     #[inline]
     pub fn extend_from_slice(&mut self, other: &[T])
     where
-        T: Clone
+        T: Clone,
     {
         self.0.extend_from_slice(other);
     }
@@ -87,7 +87,6 @@ impl<'arena, T> ArenaVec<'arena, T> {
     pub fn as_mut_ptr(&mut self) -> *mut T {
         self.0.as_mut_ptr()
     }
-
 }
 
 // Specialized implementation for u8 vectors
@@ -182,7 +181,6 @@ impl Arena {
     pub fn alloc_str(&self, s: &str) -> &str {
         self.bump.alloc_str(s)
     }
-
 
     /// Allocates a value in the arena.
     #[inline]

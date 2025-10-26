@@ -63,29 +63,24 @@ impl<'arena> Message<'arena> for PersonArena<'arena> {
     }
 
     fn encoded_len(&self) -> usize {
-        0
-            + if !self.name.is_empty() {
-                defiant::encoding::string::encoded_len(1, self.name)
-            } else {
-                0
-            }
-            + if !self.email.is_empty() {
-                defiant::encoding::string::encoded_len(2, self.email)
-            } else {
-                0
-            }
-            + if !self.phone.is_empty() {
-                defiant::encoding::string::encoded_len(3, self.phone)
-            } else {
-                0
-            }
-            + if !self.address.is_empty() {
-                defiant::encoding::string::encoded_len(4, self.address)
-            } else {
-                0
-            }
+        0 + if !self.name.is_empty() {
+            defiant::encoding::string::encoded_len(1, self.name)
+        } else {
+            0
+        } + if !self.email.is_empty() {
+            defiant::encoding::string::encoded_len(2, self.email)
+        } else {
+            0
+        } + if !self.phone.is_empty() {
+            defiant::encoding::string::encoded_len(3, self.phone)
+        } else {
+            0
+        } + if !self.address.is_empty() {
+            defiant::encoding::string::encoded_len(4, self.address)
+        } else {
+            0
+        }
     }
-
 }
 
 fn create_test_data() -> Vec<u8> {
@@ -119,4 +114,3 @@ fn test_decode() {
         assert_eq!(msg.address, "123 Main Street, Portland, OR 97201");
     }
 }
-

@@ -147,7 +147,11 @@ fn create_message_data(target_size: usize) -> Vec<u8> {
             break;
         }
 
-        defiant::encoding::encode_key(field_num, defiant::encoding::WireType::LengthDelimited, &mut data);
+        defiant::encoding::encode_key(
+            field_num,
+            defiant::encoding::WireType::LengthDelimited,
+            &mut data,
+        );
         defiant::encoding::encode_varint(field_size as u64, &mut data);
 
         let pattern = format!("field{:03}", field_num);
@@ -195,8 +199,14 @@ fn main() {
         let after_batch = dhat::HeapStats::get();
 
         println!("100 iterations cumulative:");
-        println!("  Blocks: {}", after_batch.total_blocks - before_batch.total_blocks);
-        println!("  Bytes: {}", after_batch.total_bytes - before_batch.total_bytes);
+        println!(
+            "  Blocks: {}",
+            after_batch.total_blocks - before_batch.total_blocks
+        );
+        println!(
+            "  Bytes: {}",
+            after_batch.total_bytes - before_batch.total_bytes
+        );
         println!();
     }
 
@@ -230,8 +240,14 @@ fn main() {
         let after_batch = dhat::HeapStats::get();
 
         println!("100 iterations with arena reuse:");
-        println!("  Blocks: {}", after_batch.total_blocks - before_batch.total_blocks);
-        println!("  Bytes: {}", after_batch.total_bytes - before_batch.total_bytes);
+        println!(
+            "  Blocks: {}",
+            after_batch.total_blocks - before_batch.total_blocks
+        );
+        println!(
+            "  Bytes: {}",
+            after_batch.total_bytes - before_batch.total_bytes
+        );
         println!();
     }
 }

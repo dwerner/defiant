@@ -591,9 +591,8 @@ pub mod string {
         let bytes = vec.freeze();
 
         // Validate UTF-8 and convert to &str
-        str::from_utf8(bytes).map_err(|_| DecodeError::new(
-            "invalid string value: data is not UTF-8 encoded",
-        ))
+        str::from_utf8(bytes)
+            .map_err(|_| DecodeError::new("invalid string value: data is not UTF-8 encoded"))
     }
 
     /// Encode repeated string slices
@@ -766,7 +765,7 @@ pub mod bytes {
 pub mod message {
     use super::*;
     use crate::Arena;
-    use crate::{Encode, Decode};
+    use crate::{Decode, Encode};
 
     pub fn encode<M>(tag: u32, msg: &M, buf: &mut impl BufMut)
     where
@@ -853,7 +852,7 @@ pub mod message {
 pub mod group {
     use super::*;
     use crate::Arena;
-    use crate::{Encode, Decode};
+    use crate::{Decode, Encode};
 
     pub fn encode<M>(tag: u32, msg: &M, buf: &mut impl BufMut)
     where
@@ -887,7 +886,13 @@ pub mod group {
                 return Ok(());
             }
 
-            msg.merge_field(field_tag, field_wire_type, buf, arena, ctx.enter_recursion())?;
+            msg.merge_field(
+                field_tag,
+                field_wire_type,
+                buf,
+                arena,
+                ctx.enter_recursion(),
+            )?;
         }
     }
 
@@ -959,8 +964,20 @@ pub mod arena_map {
     ) -> Result<(), DecodeError>
     where
         B: Buf,
-        KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
-        VM: Fn(WireType, &mut V, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+        KM: Fn(
+            WireType,
+            &mut K,
+            &mut B,
+            &'arena crate::Arena,
+            DecodeContext,
+        ) -> Result<(), DecodeError>,
+        VM: Fn(
+            WireType,
+            &mut V,
+            &mut B,
+            &'arena crate::Arena,
+            DecodeContext,
+        ) -> Result<(), DecodeError>,
     {
         let mut key = key_default;
         let mut val = val_default;
@@ -1000,8 +1017,20 @@ pub mod arena_map {
     ) -> Result<(), DecodeError>
     where
         B: Buf,
-        KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
-        VM: Fn(WireType, &mut VBuilder, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+        KM: Fn(
+            WireType,
+            &mut K,
+            &mut B,
+            &'arena crate::Arena,
+            DecodeContext,
+        ) -> Result<(), DecodeError>,
+        VM: Fn(
+            WireType,
+            &mut VBuilder,
+            &mut B,
+            &'arena crate::Arena,
+            DecodeContext,
+        ) -> Result<(), DecodeError>,
         VN: Fn(&'arena crate::Arena) -> VBuilder,
         VF: Fn(VBuilder) -> VView,
     {
@@ -1069,8 +1098,8 @@ pub mod arena_map {
         for (key, val) in values.iter() {
             let skip_key = key == key_default;
 
-            let len = (if skip_key { 0 } else { key_encoded_len(1, key) })
-                + val_encoded_len(2, val);
+            let len =
+                (if skip_key { 0 } else { key_encoded_len(1, key) }) + val_encoded_len(2, val);
 
             encode_key(tag, WireType::LengthDelimited, buf);
             encode_varint(len as u64, buf);
