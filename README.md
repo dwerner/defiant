@@ -270,7 +270,7 @@ defiant-build = "0.1"
 
 Create `build.rs`:
 
-```rust
+```rust,ignore
 fn main() {
     let arena = defiant::Arena::new();
 

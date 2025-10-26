@@ -381,7 +381,7 @@ impl Decode<'_> for String {
                 self.as_mut_vec().resize(len, 0);
                 buf.copy_to_slice(self.as_mut_vec());
             }
-            if !core::str::from_utf8(self.as_bytes()).is_ok() {
+            if core::str::from_utf8(self.as_bytes()).is_err() {
                 return Err(DecodeError::new("invalid UTF-8"));
             }
             Ok(())
@@ -515,7 +515,6 @@ impl Encode for () {
 
 impl Decode<'_> for () {
     fn new_in(_arena: &Arena) -> Self {
-        ()
     }
     fn merge_field(
         &mut self,

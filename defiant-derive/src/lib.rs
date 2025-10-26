@@ -533,26 +533,6 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             // If it has <'arena>, it's an arena-allocated message with a separate Builder type
             // Otherwise, it's a scalar-only message where the message type itself implements Decode
 
-            // First, strip any reference to get to the underlying type
-            let inner_value_type = match &value_type {
-                syn::Type::Reference(ref type_ref) => &*type_ref.elem,
-                other => other,
-            };
-
-            let has_lifetime = if let syn::Type::Path(ref type_path) = inner_value_type {
-                if let Some(last_seg) = type_path.path.segments.last() {
-                    if let syn::PathArguments::AngleBracketed(ref args) = last_seg.arguments {
-                        !args.args.is_empty()
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            } else {
-                false
-            };
-
             // Build the Builder type name
             // extract_type_path strips lifetimes, so Value<'arena> becomes Value
             // ALL messages have Builders now (both arena and scalar-only)

@@ -97,16 +97,6 @@ impl Field {
         }
     }
 
-    /// Returns the arena-allocated key type for maps
-    /// Lifetime parameter is 'arena by convention
-    pub fn arena_key_type(&self) -> TokenStream {
-        use scalar::Ty::*;
-        match &self.key_ty {
-            String => quote!(&'arena str),
-            _ => self.key_ty.rust_ref_type(),
-        }
-    }
-
     pub fn new(attrs: &[Meta], inferred_tag: Option<u32>) -> Result<Option<Field>, Error> {
         let mut types = None;
         let mut tag = None;

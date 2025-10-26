@@ -40,6 +40,12 @@ impl<'arena, T> ArenaVec<'arena, T> {
         self.0.len()
     }
 
+    /// Returns `true` if the vector contains no elements.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     /// Returns the total capacity of the vector.
     #[inline]
     pub fn capacity(&self) -> usize {

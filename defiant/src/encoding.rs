@@ -1004,6 +1004,7 @@ pub mod arena_map {
     ///
     /// This function is no longer used. Map fields with message values now use
     /// custom inline merge code generated in the proc macro to handle Builder/View types properly.
+    #[allow(clippy::too_many_arguments)]
     pub fn merge_message<'arena, K, VBuilder, VView, B, KM, VM, VN, VF>(
         _key_merge: KM,
         _val_merge: VM,
@@ -1038,6 +1039,7 @@ pub mod arena_map {
     }
 
     /// Generic protobuf map encode function with overridden key and value defaults.
+    #[allow(clippy::too_many_arguments)]
     pub fn encode_with_defaults<K, V, B, KE, KL, VE, VL>(
         key_encode: KE,
         key_encoded_len: KL,

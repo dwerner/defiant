@@ -93,7 +93,7 @@ impl Field {
         }
     }
 
-    pub fn merge(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
+    pub fn merge(&self, _prost_path: &Path, _ident: TokenStream) -> TokenStream {
         match self.label {
             Label::Optional => {
                 panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");

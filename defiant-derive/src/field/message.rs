@@ -104,7 +104,7 @@ impl Field {
         }
     }
 
-    pub fn merge(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
+    pub fn merge(&self, _prost_path: &Path, _ident: TokenStream) -> TokenStream {
         match self.label {
             Label::Optional => {
                 // This path should NOT be reached anymore - we generate inline builder code

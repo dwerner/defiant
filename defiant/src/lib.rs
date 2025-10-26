@@ -40,11 +40,8 @@ const RECURSION_LIMIT: u32 = 100;
 //
 // [1]: https://github.com/serde-rs/serde/blob/v1.0.89/serde/src/lib.rs#L245-L256
 #[cfg(feature = "derive")]
-#[allow(unused_imports)]
-#[macro_use]
 extern crate defiant_derive;
 #[cfg(feature = "derive")]
-#[allow(unused_imports)]
 extern crate defiant_derive as prost_derive;
 #[cfg(feature = "derive")]
 #[doc(hidden)]
