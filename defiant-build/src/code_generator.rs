@@ -25,6 +25,8 @@ use c_escaping::unescape_c_escape_string;
 mod syntax;
 use syntax::Syntax;
 
+use crate::descriptor_ext::*;
+
 /// State object for the code generation process on a single input file.
 pub struct CodeGenerator<'buf, 'ctx, 'arena> {
     context: &'buf mut Context<'ctx, 'arena>,
@@ -203,7 +205,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                     let name = format!("{}.{}", &fq_message_name, nested_type.name());
                     Either::Right((name, (key, value)))
                 } else {
-                    Either::Left((nested_type.clone(), idx))
+                    Either::Left(((*nested_type).clone(), idx))
                 }
             });
 
@@ -217,11 +219,11 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             .partition_map(|(idx, proto)| {
                 let idx = idx as i32;
                 if proto.proto3_optional.unwrap_or(false) {
-                    Either::Left(Field::new(proto.clone(), idx))
+                    Either::Left(Field::new((*proto).clone(), idx))
                 } else if let Some(oneof_index) = proto.oneof_index {
-                    Either::Right((oneof_index, Field::new(proto.clone(), idx)))
+                    Either::Right((oneof_index, Field::new((*proto).clone(), idx)))
                 } else {
-                    Either::Left(Field::new(proto.clone(), idx))
+                    Either::Left(Field::new((*proto).clone(), idx))
                 }
             });
         // Optional fields create a synthetic oneof that we want to skip
@@ -233,7 +235,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                 let idx = idx as i32;
                 oneof_map
                     .remove(&idx)
-                    .map(|fields| OneofField::new(&message, proto.clone(), fields, idx))
+                    .map(|fields| OneofField::new(&message, (*proto).clone(), fields, idx))
             })
             .collect();
 
@@ -399,7 +401,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
     fn append_skip_debug(&mut self, fq_message_name: &str) {
         if self.context.should_skip_debug(fq_message_name) {
             push_indent(self.buf, self.depth);
-            self.buf.push_str("#[prost(skip_debug)]");
+            self.buf.push_str("#[defiant(skip_debug)]");
             self.buf.push('\n');
         }
     }
@@ -447,7 +449,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         }
 
         self.push_indent();
-        self.buf.push_str("#[prost(");
+        self.buf.push_str("#[defiant(");
         let type_tag = self.field_type_tag(&field.descriptor);
         self.buf.push_str(&type_tag);
 
@@ -537,8 +539,10 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         //     self.buf
         //         .push_str(&format!("{prost_path}::alloc::boxed::Box<"));
         // }
-        // For message and group fields (optional or required), use &'arena references to arena-stored data
-        if (type_ == Type::Message || type_ == Type::Group) && !repeated {
+        // For message and group fields that have arena lifetimes, use &'arena references
+        // Scalar-only messages (no lifetime) are stored by value
+        // For repeated messages, the slice contains references: &'arena [&'arena T]
+        if (type_ == Type::Message || type_ == Type::Group) && ty.contains("<'arena>") {
             self.buf.push_str("&'arena ");
         }
         self.buf.push_str(&ty);
@@ -580,7 +584,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         let value_tag = self.map_value_type_tag(value);
 
         self.buf.push_str(&format!(
-            "#[prost({} = \"{}, {}\", tag = \"{}\")]\n",
+            "#[defiant({} = \"{}, {}\", tag = \"{}\")]\n",
             map_type.annotation(),
             key_tag,
             value_tag,
@@ -624,7 +628,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.append_doc(fq_message_name, None);
         self.push_indent();
         self.buf.push_str(&format!(
-            "#[prost(oneof = \"{}\", tags = \"{}\")]\n",
+            "#[defiant(oneof = \"{}\", tags = \"{}\")]\n",
             type_name,
             oneof
                 .fields
@@ -706,7 +710,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             self.push_indent();
             let ty_tag = self.field_type_tag(&field.descriptor);
             self.buf.push_str(&format!(
-                "#[prost({}, tag = \"{}\")]\n",
+                "#[defiant({}, tag = \"{}\")]\n",
                 ty_tag,
                 field.descriptor.number()
             ));
@@ -730,10 +734,19 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             );
 
             // No boxing needed for arena-allocated types
+            // For message and group fields that have arena lifetimes, add &'arena reference
+            // (same as regular struct fields). Scalar-only messages are owned.
+            let variant_ty = if (field.descriptor.r#type() == Type::Message || field.descriptor.r#type() == Type::Group)
+                && ty.contains("<'arena>") {
+                format!("&'arena {}", ty)
+            } else {
+                ty
+            };
+
             self.buf.push_str(&format!(
                 "{}({}),\n",
                 to_upper_camel(field.descriptor.name()),
-                ty
+                variant_ty
             ));
         }
         self.depth -= 1;
@@ -754,6 +767,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                 let len = loc.path.len();
                 len > 0 && len % 2 == 0 && loc.path == self.path
             })
+            .copied()
     }
 
     fn append_doc(&mut self, fq_name: &str, field_name: Option<&str>) {
@@ -804,7 +818,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.buf.push_str(" {\n");
 
         let variant_mappings =
-            build_enum_value_mappings(&enum_name, self.config().strip_enum_prefix, enum_values);
+            build_enum_value_mappings(&enum_name, self.config().strip_enum_prefix, *enum_values);
 
         self.depth += 1;
         self.path.push(2);
@@ -1035,9 +1049,11 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             match field.r#type() {
                 // String fields become &'arena str, Bytes become &'arena [u8]
                 Type::String | Type::Bytes => true,
-                // Message fields are ALWAYS stored as &'arena T (even if T has no lifetime)
-                // So any message with a message field needs a lifetime parameter
-                Type::Message => true,
+                // Message and Group fields: only require lifetime if the child message has a lifetime
+                // Scalar-only messages are stored by value and don't require a lifetime
+                Type::Message | Type::Group => {
+                    self.message_type_needs_lifetime(field.type_name())
+                }
                 // Scalars (int, float, bool) and enums are stack-only
                 _ => false,
             }
@@ -1071,7 +1087,11 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                 }
                 match field.r#type() {
                     Type::String | Type::Bytes => true,
-                    Type::Message => self.message_type_needs_lifetime_impl(field.type_name(), visited),
+                    Type::Message | Type::Group => {
+                        // Only require lifetime if the child message type has a lifetime
+                        // Scalar-only messages are stored by value and don't propagate lifetime requirements
+                        self.message_type_needs_lifetime_impl(field.type_name(), visited)
+                    }
                     _ => false,
                 }
             });
@@ -1199,7 +1219,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
 
     /// Returns `true` if the field options includes the `deprecated` option.
     fn deprecated(&self, field: &FieldDescriptorProto) -> bool {
-        field.options.as_ref().is_some_and(|opts| FieldOptions::deprecated(opts))
+        field.options.as_ref().is_some_and(|opts| opts.deprecated())
     }
 
     /// Returns the fully-qualified name, starting with a dot
@@ -1244,10 +1264,10 @@ struct EnumVariantMapping<'a> {
     deprecated: bool,
 }
 
-fn build_enum_value_mappings<'a>(
+fn build_enum_value_mappings<'a, 'arena>(
     generated_enum_name: &str,
     do_strip_enum_prefix: bool,
-    enum_values: &'a [EnumValueDescriptorProto],
+    enum_values: &'a [&'arena EnumValueDescriptorProto<'arena>],
 ) -> Vec<EnumVariantMapping<'a>> {
     let mut numbers = HashSet::new();
     let mut generated_names = HashMap::new();
@@ -1287,5 +1307,5 @@ fn enum_field_deprecated(value: &EnumValueDescriptorProto) -> bool {
     value
         .options
         .as_ref()
-        .is_some_and(|opts| EnumValueOptions::deprecated(opts))
+        .is_some_and(|opts| opts.deprecated())
 }

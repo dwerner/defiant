@@ -10,11 +10,11 @@ use std::process::Command;
 use log::debug;
 use log::trace;
 
-use defiant::Message;
 use defiant_types::{FileDescriptorProto, FileDescriptorSet};
 
 use crate::code_generator::CodeGenerator;
 use crate::context::Context;
+use crate::descriptor_ext::*;
 use crate::extern_paths::ExternPaths;
 use crate::message_graph::MessageGraph;
 use crate::path::PathMap;
@@ -740,10 +740,10 @@ impl<'arena> Config<'arena> {
         self
     }
 
-    /// Configures the path that's used for deriving `Message` for generated messages.
-    /// This is mainly useful for generating crates that wish to re-export prost.
-    /// Defaults to `::prost` if not specified.
-    pub fn prost_path<S>(&mut self, path: S) -> &mut Self
+    /// Configures the path that's used for deriving View/Decode for generated messages.
+    /// This is mainly useful for generating crates that wish to re-export defiant.
+    /// Defaults to `::defiant` if not specified.
+    pub fn defiant_path<S>(&mut self, path: S) -> &mut Self
     where
         S: Into<String>,
     {
@@ -751,10 +751,10 @@ impl<'arena> Config<'arena> {
         self
     }
 
-    /// Configures the path that's used well known types.
-    /// This is mainly useful for generating crates that wish to re-export prost_types.
-    /// Defaults to `::prost_types` if not specified.`
-    pub fn prost_types_path<S>(&mut self, path: S) -> &mut Self
+    /// Configures the path that's used for well known types.
+    /// This is mainly useful for generating crates that wish to re-export defiant_types.
+    /// Defaults to `::defiant_types` if not specified.
+    pub fn defiant_types_path<S>(&mut self, path: S) -> &mut Self
     where
         S: Into<String>,
     {
@@ -892,7 +892,7 @@ impl<'arena> Config<'arena> {
             .map(|descriptor| {
                 (
                     Module::from_protobuf_package_name(descriptor.package()),
-                    descriptor,
+                    *descriptor,
                 )
             })
             .collect::<Vec<_>>();
@@ -1050,7 +1050,7 @@ impl<'arena> Config<'arena> {
                 ),
             )
         })?;
-        let file_descriptor_set = FileDescriptorSet::decode(buf.as_slice(), &self.arena).map_err(|error| {
+        let file_descriptor_set = FileDescriptorSet::from_buf(buf.as_slice(), &self.arena).map_err(|error| {
             Error::new(
                 ErrorKind::InvalidInput,
                 format!("invalid FileDescriptorSet: {error}"),

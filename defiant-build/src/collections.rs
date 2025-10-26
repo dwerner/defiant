@@ -21,11 +21,11 @@ pub(crate) enum BytesType {
 }
 
 impl MapType {
-    /// The `prost-derive` annotation type corresponding to the map type.
+    /// The `defiant-derive` annotation type corresponding to the map type.
     pub fn annotation(&self) -> &'static str {
         match self {
-            MapType::HashMap => "map",
-            MapType::BTreeMap => "btree_map",
+            MapType::HashMap => "arena_map",
+            MapType::BTreeMap => "arena_map",
         }
     }
 

@@ -54,7 +54,10 @@ impl<'arena> defiant::ArenaFrom<'arena, &str> for Value<'arena> {
 impl<'arena> defiant::ArenaFrom<'arena, Vec<Value<'arena>>> for Value<'arena> {
     fn arena_from(values: Vec<Value<'arena>>, arena: &'arena defiant::Arena) -> Self {
         let mut vec = arena.new_vec();
-        vec.extend(values);
+        // Allocate each Value in the arena and store references
+        for value in values {
+            vec.push(&*arena.alloc(value));
+        }
         let values_slice = vec.freeze();
         let list_value = arena.alloc(crate::protobuf::ListValue { values: values_slice });
         value::Kind::ListValue(list_value).into()

@@ -1,5 +1,5 @@
 [package]
-name = "reexported_prost"
+name = "reexported_defiant"
 version = "0.1.0"
 authors = ["Jerko Steiner <jerko.steiner@gmail.com>"]
 edition = "2021"

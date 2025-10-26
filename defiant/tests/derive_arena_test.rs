@@ -2,14 +2,14 @@
 //!
 //! This test verifies that the #[derive(Message)] macro generates correct arena-aware code.
 
-use defiant::{Arena, Message};
+use defiant::{Arena, Message, Encode};
 
 /// A simple Person message using the derive macro
-#[derive(defiant_derive::Message)]
+#[derive(Message)]
 struct PersonDerived<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = 1)]
     name: &'arena str,
-    #[prost(int32, tag = "2")]
+    #[defiant(int32, tag = 2)]
     age: i32,
 }
 
@@ -24,7 +24,9 @@ fn test_derive_person_decode() {
     data.extend_from_slice(&[0x10, 0x1e]); // tag=2, value=30
 
     let arena = Arena::new();
-    let person = PersonDerivedMessage::decode(&data[..], &arena).unwrap();
+    let person = PersonDerivedBuilder::decode(&data[..], &arena)
+        .unwrap()
+        .freeze();
 
     assert_eq!(person.name, "Alice");
     assert_eq!(person.age, 30);
@@ -32,16 +34,18 @@ fn test_derive_person_decode() {
 
 #[test]
 fn test_derive_person_encode() {
-    let arena = Arena::new();
-    let name = arena.alloc_str("Bob");
-    let person = PersonDerived { name, age: 25 };
+    let person = PersonDerived {
+        name: "Bob",
+        age: 25
+    };
 
-    let mut buf = Vec::new();
-    person.encode(&mut buf).unwrap();
+    let buf = person.encode_to_vec();
 
     // Decode it back
-    let arena2 = Arena::new();
-    let decoded = PersonDerivedMessage::decode(&buf[..], &arena2).unwrap();
+    let arena = Arena::new();
+    let decoded = PersonDerivedBuilder::decode(&buf[..], &arena)
+        .unwrap()
+        .freeze();
     assert_eq!(decoded.name, "Bob");
     assert_eq!(decoded.age, 25);
 }
@@ -49,7 +53,8 @@ fn test_derive_person_encode() {
 #[test]
 fn test_derive_person_new_in() {
     let arena = Arena::new();
-    let person = PersonDerivedMessage::new_in(&arena);
-    assert_eq!(person.name(), "");
-    assert_eq!(person.age(), 0);
+    let builder = PersonDerivedBuilder::new_in(&arena);
+    let person = builder.freeze();
+    assert_eq!(person.name, "");
+    assert_eq!(person.age, 0);
 }

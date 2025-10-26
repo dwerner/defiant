@@ -10,60 +10,30 @@ use crate::encoding::{decode_key, message, DecodeContext};
 use crate::DecodeError;
 use crate::EncodeError;
 
-/// A Protocol Buffers message with arena-allocated lifetime.
+/// Trait for encoding protobuf messages.
 ///
-/// All messages have a lifetime parameter `'arena` that ties them to the
-/// arena from which they were decoded. This enables zero-copy deserialization
-/// by allocating all message data from the arena.
+/// This trait is implemented by view types - frozen, immutable message snapshots
+/// that can be efficiently encoded to the protobuf wire format.
 ///
-/// # Lifetimes
-///
-/// The `'arena` lifetime represents the lifetime of the arena from which the
-/// message was allocated. Messages cannot outlive their arena.
+/// Views are created by calling `freeze()` on a builder, or by decoding bytes
+/// and immediately freezing.
 ///
 /// # Examples
 ///
 /// ```ignore
-/// use defiant::{Message, Arena};
+/// use defiant::{Encode, Arena};
 ///
-/// let arena = Arena::new();
-/// let msg = MyMessage::decode(bytes, &arena)?;
-/// // msg is tied to arena lifetime
-/// // When arena drops, all message data is freed
+/// let view: MyMessage = ...; // frozen view
+/// let bytes = view.encode_to_vec();
 /// ```
-pub trait Message<'arena>: Sized + Send + Sync + 'arena {
-    /// Creates a new empty message initialized with the arena.
-    ///
-    /// This is used internally during decoding to create a message that can
-    /// accumulate repeated fields using arena-allocated storage.
-    ///
-    /// Meant to be used only by `Message` implementations.
-    #[doc(hidden)]
-    fn new_in(arena: &'arena Arena) -> Self;
-
-    /// Encodes the message to a buffer.
+pub trait Encode {
+    /// Encodes the message to a buffer without a length delimiter.
     ///
     /// This method will panic if the buffer has insufficient capacity.
     ///
-    /// Meant to be used only by `Message` implementations.
+    /// Meant to be used only by `Encode` implementations.
     #[doc(hidden)]
     fn encode_raw(&self, buf: &mut impl BufMut);
-
-    /// Decodes a field from a buffer, and merges it into `self`.
-    ///
-    /// The arena is used to allocate any variable-length data (strings, bytes,
-    /// repeated fields, etc.).
-    ///
-    /// Meant to be used only by `Message` implementations.
-    #[doc(hidden)]
-    fn merge_field(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        buf: &mut impl Buf,
-        arena: &'arena Arena,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>;
 
     /// Returns the encoded length of the message without a length delimiter.
     fn encoded_len(&self) -> usize;
@@ -87,17 +57,6 @@ pub trait Message<'arena>: Sized + Send + Sync + 'arena {
         let mut buf = Vec::with_capacity(self.encoded_len());
         self.encode_raw(&mut buf);
         buf
-    }
-
-    /// Encodes the message directly into arena-allocated memory.
-    ///
-    /// Encodes directly to an ArenaVec in the arena (zero heap allocation),
-    /// then freezes it to an immutable slice.
-    fn arena_encode(&self, arena: &'arena Arena) -> &'arena [u8] {
-        let len = self.encoded_len();
-        let mut buf = arena.new_vec_with_capacity::<u8>(len);
-        self.encode_raw(&mut buf);  // ArenaVec<u8> implements BufMut!
-        buf.freeze()
     }
 
     /// Encodes the message with a length-delimiter to a buffer.
@@ -124,6 +83,64 @@ pub trait Message<'arena>: Sized + Send + Sync + 'arena {
         self.encode_raw(&mut buf);
         buf
     }
+
+    /// Encodes the message directly into arena-allocated memory.
+    ///
+    /// Encodes directly to an ArenaVec in the arena (zero heap allocation),
+    /// then freezes it to an immutable slice.
+    fn arena_encode<'arena>(&self, arena: &'arena Arena) -> &'arena [u8] {
+        let len = self.encoded_len();
+        let mut buf = arena.new_vec_with_capacity::<u8>(len);
+        self.encode_raw(&mut buf);  // ArenaVec<u8> implements BufMut!
+        buf.freeze()
+    }
+}
+
+/// Trait for decoding protobuf messages.
+///
+/// This trait is implemented by builder types - mutable, arena-allocated construction
+/// helpers that accumulate data during decoding. Builders can be frozen into immutable
+/// views after construction is complete.
+///
+/// # Lifetimes
+///
+/// The `'arena` lifetime represents the lifetime of the arena from which the
+/// builder allocates data. Builders cannot outlive their arena.
+///
+/// # Examples
+///
+/// ```ignore
+/// use defiant::{Decode, Arena};
+///
+/// let arena = Arena::new();
+/// let builder = MyMessageBuilder::decode(bytes, &arena)?;
+/// let view = builder.freeze(); // convert to immutable view
+/// ```
+pub trait Decode<'arena>: Sized + 'arena {
+    /// Creates a new empty builder initialized with the arena.
+    ///
+    /// This is used internally during decoding to create a builder that can
+    /// accumulate repeated fields using arena-allocated storage.
+    ///
+    /// Meant to be used only by `Decode` implementations.
+    #[doc(hidden)]
+    fn new_in(arena: &'arena Arena) -> Self;
+
+    /// Decodes a field from a buffer, and merges it into `self`.
+    ///
+    /// The arena is used to allocate any variable-length data (strings, bytes,
+    /// repeated fields, etc.).
+    ///
+    /// Meant to be used only by `Decode` implementations.
+    #[doc(hidden)]
+    fn merge_field(
+        &mut self,
+        tag: u32,
+        wire_type: WireType,
+        buf: &mut impl Buf,
+        arena: &'arena Arena,
+        ctx: DecodeContext,
+    ) -> Result<(), DecodeError>;
 
     /// Decodes an instance of the message from a buffer using the provided arena.
     ///
@@ -171,18 +188,14 @@ pub trait Message<'arena>: Sized + Send + Sync + 'arena {
     }
 }
 
-// Note: Box<M> impl removed - boxes don't work well with arena lifetimes
-// Users should allocate messages directly in the arena instead
+/// Links a view type to its corresponding builder type.
+///
+/// This trait associates an immutable view (which implements `Encode`) with
+/// its mutable builder (which implements `Decode`).
+pub trait MessageView<'arena>: Sized {
+    /// The builder type for constructing this view
+    type Builder: Decode<'arena>;
 
-// Note: We don't implement Message for &T or Option<&T> because:
-// 1. It causes infinite recursion (dereferencing and reborrowing)
-// 2. View types implement Message directly now
-// 3. Oneofs with recursive types need custom handling in the derive macro
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // Message trait is now lifetime-parameterized, making it non-object-safe
-    // This is acceptable as we're not using trait objects for messages
+    /// Constructs a View from encoded bytes
+    fn from_buf(buf: impl bytes::Buf, arena: &'arena Arena) -> Result<Self, DecodeError>;
 }

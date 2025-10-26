@@ -10,6 +10,12 @@ pub mod conformance {
     include!(concat!(env!("OUT_DIR"), "/conformance.rs"));
 }
 
+pub mod google {
+    pub mod protobuf {
+        include!(concat!(env!("OUT_DIR"), "/google.protobuf.rs"));
+    }
+}
+
 pub mod test_messages {
     pub mod proto2 {
         include!(concat!(

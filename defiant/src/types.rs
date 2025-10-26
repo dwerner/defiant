@@ -17,18 +17,28 @@ use crate::{
     encoding::{
         bool, bytes, double, float, int32, int64, skip_field, string, uint32, uint64, DecodeContext,
     },
-    DecodeError, Message, Name,
+    Decode, DecodeError, Encode, Name,
 };
 
 /// `google.protobuf.BoolValue`
-impl Message<'_> for bool {
-    fn new_in(_arena: &Arena) -> Self {
-        false
-    }
+impl Encode for bool {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self {
             bool::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self {
+            2
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for bool {
+    fn new_in(_arena: &Arena) -> Self {
+        false
     }
     fn merge_field(
         &mut self,
@@ -44,13 +54,6 @@ impl Message<'_> for bool {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self {
-            2
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.BoolValue`
@@ -64,14 +67,24 @@ impl Name for bool {
 }
 
 /// `google.protobuf.UInt32Value`
-impl Message<'_> for u32 {
-    fn new_in(_arena: &Arena) -> Self {
-        0
-    }
+impl Encode for u32 {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             uint32::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self != 0 {
+            uint32::encoded_len(1, self)
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for u32 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
     }
     fn merge_field(
         &mut self,
@@ -87,13 +100,6 @@ impl Message<'_> for u32 {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            uint32::encoded_len(1, self)
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.UInt32Value`
@@ -107,14 +113,24 @@ impl Name for u32 {
 }
 
 /// `google.protobuf.UInt64Value`
-impl Message<'_> for u64 {
-    fn new_in(_arena: &Arena) -> Self {
-        0
-    }
+impl Encode for u64 {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             uint64::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self != 0 {
+            uint64::encoded_len(1, self)
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for u64 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
     }
     fn merge_field(
         &mut self,
@@ -130,13 +146,6 @@ impl Message<'_> for u64 {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            uint64::encoded_len(1, self)
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.UInt64Value`
@@ -150,14 +159,24 @@ impl Name for u64 {
 }
 
 /// `google.protobuf.Int32Value`
-impl Message<'_> for i32 {
-    fn new_in(_arena: &Arena) -> Self {
-        0
-    }
+impl Encode for i32 {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             int32::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self != 0 {
+            int32::encoded_len(1, self)
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for i32 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
     }
     fn merge_field(
         &mut self,
@@ -173,13 +192,6 @@ impl Message<'_> for i32 {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            int32::encoded_len(1, self)
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.Int32Value`
@@ -193,14 +205,24 @@ impl Name for i32 {
 }
 
 /// `google.protobuf.Int64Value`
-impl Message<'_> for i64 {
-    fn new_in(_arena: &Arena) -> Self {
-        0
-    }
+impl Encode for i64 {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0 {
             int64::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self != 0 {
+            int64::encoded_len(1, self)
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for i64 {
+    fn new_in(_arena: &Arena) -> Self {
+        0
     }
     fn merge_field(
         &mut self,
@@ -216,13 +238,6 @@ impl Message<'_> for i64 {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self != 0 {
-            int64::encoded_len(1, self)
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.Int64Value`
@@ -236,14 +251,24 @@ impl Name for i64 {
 }
 
 /// `google.protobuf.FloatValue`
-impl Message<'_> for f32 {
-    fn new_in(_arena: &Arena) -> Self {
-        0.0
-    }
+impl Encode for f32 {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0.0 {
             float::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self != 0.0 {
+            float::encoded_len(1, self)
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for f32 {
+    fn new_in(_arena: &Arena) -> Self {
+        0.0
     }
     fn merge_field(
         &mut self,
@@ -259,13 +284,6 @@ impl Message<'_> for f32 {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self != 0.0 {
-            float::encoded_len(1, self)
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.FloatValue`
@@ -279,14 +297,24 @@ impl Name for f32 {
 }
 
 /// `google.protobuf.DoubleValue`
-impl Message<'_> for f64 {
-    fn new_in(_arena: &Arena) -> Self {
-        0.0
-    }
+impl Encode for f64 {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if *self != 0.0 {
             double::encode(1, self, buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if *self != 0.0 {
+            double::encoded_len(1, self)
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for f64 {
+    fn new_in(_arena: &Arena) -> Self {
+        0.0
     }
     fn merge_field(
         &mut self,
@@ -302,13 +330,6 @@ impl Message<'_> for f64 {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if *self != 0.0 {
-            double::encoded_len(1, self)
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.DoubleValue`
@@ -322,14 +343,24 @@ impl Name for f64 {
 }
 
 /// `google.protobuf.StringValue`
-impl Message<'_> for String {
-    fn new_in(_arena: &Arena) -> Self {
-        String::new()
-    }
+impl Encode for String {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if !self.is_empty() {
             string::encode(1, self.as_str(), buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if !self.is_empty() {
+            string::encoded_len(1, self.as_str())
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for String {
+    fn new_in(_arena: &Arena) -> Self {
+        String::new()
     }
     fn merge_field(
         &mut self,
@@ -358,13 +389,6 @@ impl Message<'_> for String {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if !self.is_empty() {
-            string::encoded_len(1, self.as_str())
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.StringValue`
@@ -378,14 +402,24 @@ impl Name for String {
 }
 
 /// `google.protobuf.BytesValue`
-impl Message<'_> for Vec<u8> {
-    fn new_in(_arena: &Arena) -> Self {
-        Vec::new()
-    }
+impl Encode for Vec<u8> {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if !self.is_empty() {
             bytes::encode(1, self.as_slice(), buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if !self.is_empty() {
+            bytes::encoded_len(1, self.as_slice())
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for Vec<u8> {
+    fn new_in(_arena: &Arena) -> Self {
+        Vec::new()
     }
     fn merge_field(
         &mut self,
@@ -408,13 +442,6 @@ impl Message<'_> for Vec<u8> {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if !self.is_empty() {
-            bytes::encoded_len(1, self.as_slice())
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.BytesValue`
@@ -428,14 +455,24 @@ impl Name for Vec<u8> {
 }
 
 /// `google.protobuf.BytesValue`
-impl Message<'_> for Bytes {
-    fn new_in(_arena: &Arena) -> Self {
-        Bytes::new()
-    }
+impl Encode for Bytes {
     fn encode_raw(&self, buf: &mut impl BufMut) {
         if !self.is_empty() {
             bytes::encode(1, self.as_ref(), buf)
         }
+    }
+    fn encoded_len(&self) -> usize {
+        if !self.is_empty() {
+            bytes::encoded_len(1, self.as_ref())
+        } else {
+            0
+        }
+    }
+}
+
+impl Decode<'_> for Bytes {
+    fn new_in(_arena: &Arena) -> Self {
+        Bytes::new()
     }
     fn merge_field(
         &mut self,
@@ -456,13 +493,6 @@ impl Message<'_> for Bytes {
             skip_field(wire_type, tag, buf, ctx)
         }
     }
-    fn encoded_len(&self) -> usize {
-        if !self.is_empty() {
-            bytes::encoded_len(1, self.as_ref())
-        } else {
-            0
-        }
-    }
 }
 
 /// `google.protobuf.BytesValue`
@@ -476,11 +506,17 @@ impl Name for Bytes {
 }
 
 /// `google.protobuf.Empty`
-impl Message<'_> for () {
+impl Encode for () {
+    fn encode_raw(&self, _buf: &mut impl BufMut) {}
+    fn encoded_len(&self) -> usize {
+        0
+    }
+}
+
+impl Decode<'_> for () {
     fn new_in(_arena: &Arena) -> Self {
         ()
     }
-    fn encode_raw(&self, _buf: &mut impl BufMut) {}
     fn merge_field(
         &mut self,
         tag: u32,
@@ -490,9 +526,6 @@ impl Message<'_> for () {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError> {
         skip_field(wire_type, tag, buf, ctx)
-    }
-    fn encoded_len(&self) -> usize {
-        0
     }
 }
 
@@ -607,3 +640,4 @@ mod tests {
         );
     }
 }
+

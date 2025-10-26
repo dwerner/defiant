@@ -62,7 +62,7 @@ fn basic() {
 #[test]
 fn tuple_struct() {
     #[derive(Clone, PartialEq, defiant::Message)]
-    struct NewType(#[prost(enumeration = "BasicEnumeration", tag = "5")] i32);
+    struct NewType(#[defiant(enumeration = "BasicEnumeration", tag = "5")] i32);
     assert_eq!(
         format!("{:?}", NewType(BasicEnumeration::TWO as i32)),
         "NewType(TWO)"
@@ -72,17 +72,17 @@ fn tuple_struct() {
 
 #[derive(Clone, PartialEq, prost::Oneof)]
 pub enum OneofWithEnum {
-    #[prost(int32, tag = "8")]
+    #[defiant(int32, tag = "8")]
     Int(i32),
-    #[prost(string, tag = "9")]
+    #[defiant(string, tag = "9")]
     String(String),
-    #[prost(enumeration = "BasicEnumeration", tag = "10")]
+    #[defiant(enumeration = "BasicEnumeration", tag = "10")]
     Enumeration(i32),
 }
 
 #[derive(Clone, PartialEq, defiant::Message)]
 struct MessageWithOneof {
-    #[prost(oneof = "OneofWithEnum", tags = "8, 9, 10")]
+    #[defiant(oneof = "OneofWithEnum", tags = "8, 9, 10")]
     of: Option<OneofWithEnum>,
 }
 

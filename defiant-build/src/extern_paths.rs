@@ -38,31 +38,33 @@ impl ExternPaths {
 
         if prost_types {
             extern_paths.insert(".google.protobuf".to_string(), prost_types_path.to_string())?;
-            extern_paths.insert(".google.protobuf.BoolValue".to_string(), "bool".to_string())?;
-            extern_paths.insert(
-                ".google.protobuf.BytesValue".to_string(),
-                format!("{prost_path}::alloc::vec::Vec<u8>"),
-            )?;
-            extern_paths.insert(
-                ".google.protobuf.DoubleValue".to_string(),
-                "f64".to_string(),
-            )?;
+            // Don't extern-map wrapper types - they need proper View/Builder pairs
+            // The wrapper types will be generated as normal messages
+            // extern_paths.insert(".google.protobuf.BoolValue".to_string(), "bool".to_string())?;
+            // extern_paths.insert(
+            //     ".google.protobuf.BytesValue".to_string(),
+            //     "&'arena [u8]".to_string(),
+            // )?;
+            // extern_paths.insert(
+            //     ".google.protobuf.DoubleValue".to_string(),
+            //     "f64".to_string(),
+            // )?;
             extern_paths.insert(".google.protobuf.Empty".to_string(), "()".to_string())?;
-            extern_paths.insert(".google.protobuf.FloatValue".to_string(), "f32".to_string())?;
-            extern_paths.insert(".google.protobuf.Int32Value".to_string(), "i32".to_string())?;
-            extern_paths.insert(".google.protobuf.Int64Value".to_string(), "i64".to_string())?;
-            extern_paths.insert(
-                ".google.protobuf.StringValue".to_string(),
-                format!("{prost_path}::alloc::string::String"),
-            )?;
-            extern_paths.insert(
-                ".google.protobuf.UInt32Value".to_string(),
-                "u32".to_string(),
-            )?;
-            extern_paths.insert(
-                ".google.protobuf.UInt64Value".to_string(),
-                "u64".to_string(),
-            )?;
+            // extern_paths.insert(".google.protobuf.FloatValue".to_string(), "f32".to_string())?;
+            // extern_paths.insert(".google.protobuf.Int32Value".to_string(), "i32".to_string())?;
+            // extern_paths.insert(".google.protobuf.Int64Value".to_string(), "i64".to_string())?;
+            // extern_paths.insert(
+            //     ".google.protobuf.StringValue".to_string(),
+            //     "&'arena str".to_string(),
+            // )?;
+            // extern_paths.insert(
+            //     ".google.protobuf.UInt32Value".to_string(),
+            //     "u32".to_string(),
+            // )?;
+            // extern_paths.insert(
+            //     ".google.protobuf.UInt64Value".to_string(),
+            //     "u64".to_string(),
+            // )?;
         }
 
         Ok(extern_paths)
@@ -163,7 +165,7 @@ mod tests {
 
     #[test]
     fn test_well_known_types() {
-        let paths = ExternPaths::new(&[], "::prost", "::prost_types", true).unwrap();
+        let paths = ExternPaths::new(&[], "::defiant", "::defiant_types", true).unwrap();
 
         let case = |proto_ident: &str, resolved_ident: &str| {
             assert_eq!(paths.resolve_ident(proto_ident).unwrap(), resolved_ident);
@@ -171,10 +173,11 @@ mod tests {
 
         case(".google.protobuf.Value", "::defiant_types::Value");
         case(".google.protobuf.Duration", "::defiant_types::Duration");
-        case(
-            ".google.protobuf.BytesValue",
-            "::defiant::alloc::vec::Vec<u8>",
-        );
+        // Wrapper types are no longer extern-mapped, they're generated as regular messages
+        // case(
+        //     ".google.protobuf.BytesValue",
+        //     "&'arena [u8]",
+        // );
         case(".google.protobuf.Empty", "()");
     }
 
@@ -182,8 +185,8 @@ mod tests {
     fn test_well_known_types_reexported_prost() {
         let paths = ExternPaths::new(
             &[],
-            "::some_crate::prost",
-            "::some_crate::prost_types",
+            "::some_crate::defiant",
+            "::some_crate::defiant_types",
             true,
         )
         .unwrap();
@@ -197,10 +200,11 @@ mod tests {
             ".google.protobuf.Duration",
             "::some_crate::defiant_types::Duration",
         );
-        case(
-            ".google.protobuf.BytesValue",
-            "::some_crate::defiant::alloc::vec::Vec<u8>",
-        );
+        // Wrapper types are no longer extern-mapped, they're generated as regular messages
+        // case(
+        //     ".google.protobuf.BytesValue",
+        //     "&'arena [u8]",
+        // );
         case(".google.protobuf.Empty", "()");
     }
 

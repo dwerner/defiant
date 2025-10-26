@@ -56,7 +56,7 @@ use core::time;
 use defiant::alloc::format;
 use defiant::alloc::string::String;
 use defiant::alloc::vec::Vec;
-use defiant::{DecodeError, EncodeError, Message, Name};
+use defiant::{Decode, DecodeError, Encode, EncodeError, Name};
 
 pub use protobuf::*;
 

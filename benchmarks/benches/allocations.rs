@@ -1,4 +1,4 @@
-use defiant::Message;
+use defiant::{Encode, Message};
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
@@ -35,7 +35,7 @@ fn main() {
     {
         let arena = defiant::Arena::new();
         let dataset_bytes = benchmarks::dataset::google_message1_proto2();
-        let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
+        let dataset = BenchmarkDataset::from_buf(dataset_bytes, &arena).unwrap();
 
         println!("\n=== Allocation Profile: google_message1_proto2 ===");
         println!("Number of messages in dataset: {}", dataset.payload.len());
@@ -44,7 +44,7 @@ fn main() {
 
         let mut total_bytes = 0;
         for buf in dataset.payload {
-            let message = benchmarks::proto2::GoogleMessage1::decode(*buf, &arena).unwrap();
+            let message = benchmarks::proto2::GoogleMessage1::from_buf(*buf, &arena).unwrap();
             total_bytes += buf.len();
             drop(message);
         }
@@ -57,7 +57,7 @@ fn main() {
     {
         let arena = defiant::Arena::new();
         let dataset_bytes = benchmarks::dataset::google_message1_proto3();
-        let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
+        let dataset = BenchmarkDataset::from_buf(dataset_bytes, &arena).unwrap();
 
         println!("\n=== Allocation Profile: google_message1_proto3 ===");
         println!("Number of messages in dataset: {}", dataset.payload.len());
@@ -66,7 +66,7 @@ fn main() {
 
         let mut total_bytes = 0;
         for buf in dataset.payload {
-            let message = benchmarks::proto3::GoogleMessage1::decode(*buf, &arena).unwrap();
+            let message = benchmarks::proto3::GoogleMessage1::from_buf(*buf, &arena).unwrap();
             total_bytes += buf.len();
             drop(message);
         }
@@ -79,7 +79,7 @@ fn main() {
     {
         let arena = defiant::Arena::new();
         let dataset_bytes = benchmarks::dataset::google_message2();
-        let dataset = BenchmarkDataset::decode(dataset_bytes, &arena).unwrap();
+        let dataset = BenchmarkDataset::from_buf(dataset_bytes, &arena).unwrap();
 
         println!("\n=== Allocation Profile: google_message2 ===");
         println!("Number of messages in dataset: {}", dataset.payload.len());
@@ -90,7 +90,7 @@ fn main() {
         let mut successful = 0;
         let mut failed = 0;
         for buf in dataset.payload {
-            match benchmarks::proto2::GoogleMessage2::decode(*buf, &arena) {
+            match benchmarks::proto2::GoogleMessage2::from_buf(*buf, &arena) {
                 Ok(message) => {
                     total_bytes += buf.len();
                     successful += 1;

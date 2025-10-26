@@ -4,16 +4,16 @@ impl CustomType for u64 {}
 
 #[derive(Clone, prost::Oneof)]
 enum GenericEnum<A: CustomType> {
-    #[prost(message, tag = "1")]
+    #[defiant(message, tag = "1")]
     Data(GenericMessage<A>),
-    #[prost(uint64, tag = "2")]
+    #[defiant(uint64, tag = "2")]
     #[allow(dead_code)]
     Number(u64),
 }
 
 #[derive(Clone, defiant::Message)]
 struct GenericMessage<A: CustomType> {
-    #[prost(message, tag = "1")]
+    #[defiant(message, tag = "1")]
     data: Option<A>,
 }
 

@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use defiant::{Arena, Message};
+use defiant::{Arena, Encode, Message};
 use std::error::Error;
 
 pub mod benchmarks {
@@ -30,7 +30,7 @@ pub mod benchmarks {
 use crate::benchmarks::BenchmarkDataset;
 
 fn load_dataset<'arena>(dataset: &[u8], arena: &'arena Arena) -> Result<BenchmarkDataset<'arena>, Box<dyn Error>> {
-    Ok(BenchmarkDataset::decode(dataset, arena)?)
+    Ok(BenchmarkDataset::from_buf(dataset, arena)?)
 }
 
 macro_rules! dataset {
@@ -45,7 +45,7 @@ macro_rules! dataset {
                 b.iter(|| {
                     for buf in dataset.payload {
                         let arena = Arena::new();
-                        let message = <$ty>::decode(*buf, &arena).unwrap();
+                        let message = <$ty>::from_buf(*buf, &arena).unwrap();
                         std::hint::black_box(&message);
                     }
                 });
@@ -59,7 +59,7 @@ macro_rules! dataset {
                 let messages: Vec<_> = dataset
                     .payload
                     .iter()
-                    .map(|buf| <$ty>::decode(*buf, &arena).unwrap())
+                    .map(|buf| <$ty>::from_buf(*buf, &arena).unwrap())
                     .collect();
                 let mut buf = Vec::with_capacity(messages.iter().map(|m| m.encoded_len()).sum::<usize>());
                 b.iter(|| {
@@ -79,7 +79,7 @@ macro_rules! dataset {
                 let messages: Vec<_> = dataset
                     .payload
                     .iter()
-                    .map(|buf| <$ty>::decode(*buf, &arena).unwrap())
+                    .map(|buf| <$ty>::from_buf(*buf, &arena).unwrap())
                     .collect();
                 b.iter(|| {
                     let encoded_len = messages.iter().map(|m| m.encoded_len()).sum::<usize>();

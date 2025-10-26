@@ -14,11 +14,10 @@ pub enum MapTy {
 
 impl MapTy {
     fn from_str(s: &str) -> Option<MapTy> {
-        // TODO: Rename these attributes to "arena_map" to reflect that all maps use
-        // arena allocation now. Current syntax like `prost(btree_map = "string, message")`
-        // should become `prost(arena_map = "string, message")` for clarity.
+        // All maps use arena allocation, so "arena_map" is the preferred annotation.
+        // We also accept legacy "map", "hash_map", and "btree_map" for now.
         match s {
-            "map" | "hash_map" => Some(MapTy::HashMap),
+            "arena_map" | "map" | "hash_map" => Some(MapTy::HashMap),
             "btree_map" => Some(MapTy::BTreeMap),
             _ => None,
         }
@@ -67,15 +66,39 @@ impl Field {
             Int64 | Sint64 | Sfixed64 => quote!(0i64),
             Uint32 | Fixed32 => quote!(0u32),
             Uint64 | Fixed64 => quote!(0u64),
-            _ => quote!(Default::default()),
+            // Map keys can only be integral types, bool, or string per protobuf spec
+            // Bytes and Enumeration are not valid map key types
+            Float | Double | Bytes(_) | Enumeration(_) => {
+                panic!("Invalid map key type: {:?}", self.key_ty)
+            }
+        }
+    }
+
+    fn value_default(&self) -> TokenStream {
+        match &self.value_ty {
+            ValueTy::Scalar(scalar::Ty::String) => quote!(""),
+            ValueTy::Scalar(scalar::Ty::Bytes(_)) => quote!(&b""[..]),
+            ValueTy::Scalar(scalar::Ty::Bool) => quote!(false),
+            ValueTy::Scalar(scalar::Ty::Int32 | scalar::Ty::Sint32 | scalar::Ty::Sfixed32) => quote!(0i32),
+            ValueTy::Scalar(scalar::Ty::Int64 | scalar::Ty::Sint64 | scalar::Ty::Sfixed64) => quote!(0i64),
+            ValueTy::Scalar(scalar::Ty::Uint32 | scalar::Ty::Fixed32) => quote!(0u32),
+            ValueTy::Scalar(scalar::Ty::Uint64 | scalar::Ty::Fixed64) => quote!(0u64),
+            ValueTy::Scalar(scalar::Ty::Float) => quote!(0f32),
+            ValueTy::Scalar(scalar::Ty::Double) => quote!(0f64),
+            // Enumeration defaults are handled separately where used (e.g., #ty::default() as i32)
+            // Message defaults are not needed - we use encode_message/encoded_len_message instead
+            ValueTy::Scalar(scalar::Ty::Enumeration(_)) | ValueTy::Message => {
+                panic!("value_default() should not be called for enumerations or messages")
+            }
         }
     }
 
     /// Returns the arena-allocated key type for maps
-    fn arena_key_type(&self) -> TokenStream {
+    /// Lifetime parameter is 'arena by convention
+    pub fn arena_key_type(&self) -> TokenStream {
         use scalar::Ty::*;
         match &self.key_ty {
-            String => quote!(&'a str),
+            String => quote!(&'arena str),
             _ => self.key_ty.rust_ref_type(),
         }
     }
@@ -185,9 +208,26 @@ impl Field {
             }
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
-                let ve = quote!(#prost_path::encoding::#val_mod::encode);
-                let vl = quote!(#prost_path::encoding::#val_mod::encoded_len);
-                let val_default = value_ty.rust_ref_type();
+                // For strings and bytes in maps: map stores &[(&str, &[u8])]
+                // encode_with_defaults does .iter() which yields &(&str, &[u8])
+                // Destructuring gives (key, val) where key: &&str, val: &&[u8]
+                // encode functions expect encode(tag, &str, buf) and encode(tag, &[u8], buf)
+                // So we need to dereference: *val to go from &&[u8] -> &[u8]
+                let (ve, vl) = match value_ty {
+                    scalar::Ty::String => {
+                        (quote!(|tag, val: &&str, buf| #prost_path::encoding::#val_mod::encode(tag, *val, buf)),
+                         quote!(|tag, val: &&str| #prost_path::encoding::#val_mod::encoded_len(tag, *val)))
+                    }
+                    scalar::Ty::Bytes(_) => {
+                        (quote!(|tag, val: &&[u8], buf| #prost_path::encoding::#val_mod::encode(tag, *val, buf)),
+                         quote!(|tag, val: &&[u8]| #prost_path::encoding::#val_mod::encoded_len(tag, *val)))
+                    }
+                    _ => {
+                        (quote!(#prost_path::encoding::#val_mod::encode),
+                         quote!(#prost_path::encoding::#val_mod::encoded_len))
+                    }
+                };
+                let val_default = self.value_default();
                 quote! {
                     #prost_path::encoding::#module::encode_with_defaults(
                         #ke,
@@ -195,7 +235,7 @@ impl Field {
                         #ve,
                         #vl,
                         &#key_default,
-                        &#val_default::default(),
+                        &#val_default,
                         #tag,
                         #map_value,
                         buf,
@@ -203,23 +243,18 @@ impl Field {
                 }
             }
             ValueTy::Message => {
-                // For messages, create a temporary default for comparison
-                // (though in practice, message map values are rarely equal to default)
+                // For message types, use encode_message which doesn't need val_default
                 quote! {
-                    {
-                        let val_default = ::core::default::Default::default();
-                        #prost_path::encoding::#module::encode_with_defaults(
-                            #ke,
-                            #kl,
-                            #prost_path::encoding::message::encode,
-                            #prost_path::encoding::message::encoded_len,
-                            &#key_default,
-                            &val_default,
-                            #tag,
-                            #map_value,
-                            buf,
-                        );
-                    }
+                    #prost_path::encoding::#module::encode_message(
+                        #ke,
+                        #kl,
+                        #prost_path::encoding::message::encode,
+                        #prost_path::encoding::message::encoded_len,
+                        &#key_default,
+                        #tag,
+                        #map_value,
+                        buf,
+                    );
                 }
             },
         }
@@ -246,16 +281,18 @@ impl Field {
 
         match &self.value_ty {
             ValueTy::Scalar(scalar::Ty::Enumeration(ty)) => {
-                let default = quote!(#ty::default() as i32);
+                let key_default = self.key_default();
+                let val_default = quote!(#ty::default() as i32);
                 // Wrap int32::merge to ignore arena
                 let vm = quote!(|wire_type, val, buf, _arena, ctx| {
                     #prost_path::encoding::int32::merge(wire_type, val, buf, ctx)
                 });
                 quote! {
-                    #prost_path::encoding::#module::merge_with_default(
+                    #prost_path::encoding::#module::merge_with_defaults(
                         #km,
                         #vm,
-                        #default,
+                        #key_default,
+                        #val_default,
                         &mut #ident,
                         buf,
                         arena,
@@ -264,6 +301,8 @@ impl Field {
                 }
             }
             ValueTy::Scalar(value_ty) => {
+                let key_default = self.key_default();
+                let val_default = self.value_default();
                 let val_mod = value_ty.module();
                 // Wrap scalar merge functions to ignore arena
                 let vm = if value_ty.is_numeric() || matches!(value_ty, scalar::Ty::Bool) {
@@ -282,24 +321,25 @@ impl Field {
                         Ok(())
                     })
                 };
-                quote!(#prost_path::encoding::#module::merge(#km, #vm, &mut #ident, buf, arena, ctx))
-            }
-            ValueTy::Message => {
-                // Wrap message::merge in a closure to delay trait bound checking
-                // This allows circular dependencies (e.g., Struct -> Value -> Struct)
-                let vm = quote!(|wire_type, val, buf, arena, ctx| {
-                    #prost_path::encoding::message::merge(wire_type, val, buf, arena, ctx)
-                });
                 quote! {
-                    #prost_path::encoding::#module::merge(
+                    #prost_path::encoding::#module::merge_with_defaults(
                         #km,
                         #vm,
+                        #key_default,
+                        #val_default,
                         &mut #ident,
                         buf,
                         arena,
                         ctx,
                     )
                 }
+            }
+            ValueTy::Message => {
+                // Map fields with message values should use the custom inline merge code
+                // generated in lib.rs, not the encoding::arena_map::merge_message function.
+                // This is already handled by is_map_with_message_values check in lib.rs.
+                // If we get here, something is wrong with the code generation logic.
+                panic!("Map fields with message values should use custom inline merge code, not field.merge()")
             },
         }
     }
@@ -335,14 +375,25 @@ impl Field {
             }
             ValueTy::Scalar(value_ty) => {
                 let val_mod = value_ty.module();
-                let vl = quote!(#prost_path::encoding::#val_mod::encoded_len);
-                let val_default = value_ty.rust_ref_type();
+                // String and bytes values are &str/&[u8], need to dereference from &&str/&&[u8]
+                let vl = match value_ty {
+                    scalar::Ty::String => {
+                        quote!(|tag, val: &&str| #prost_path::encoding::#val_mod::encoded_len(tag, *val))
+                    }
+                    scalar::Ty::Bytes(_) => {
+                        quote!(|tag, val: &&[u8]| #prost_path::encoding::#val_mod::encoded_len(tag, *val))
+                    }
+                    _ => {
+                        quote!(#prost_path::encoding::#val_mod::encoded_len)
+                    }
+                };
+                let val_default = self.value_default();
                 quote! {
                     #prost_path::encoding::#module::encoded_len_with_defaults(
                         #kl,
                         #vl,
                         &#key_default,
-                        &#val_default::default(),
+                        &#val_default,
                         #tag,
                         #map_value,
                     )
@@ -350,12 +401,12 @@ impl Field {
             }
             ValueTy::Message => quote! {
                 {
-                    let val_default = ::core::default::Default::default();
-                    #prost_path::encoding::#module::encoded_len_with_defaults(
+                    // For message types, we can't create a default value without an arena
+                    // Use encoded_len_message which doesn't require V: Default
+                    #prost_path::encoding::#module::encoded_len_message(
                         #kl,
                         #prost_path::encoding::message::encoded_len,
                         &#key_default,
-                        &val_default,
                         #tag,
                         #map_value,
                     )
@@ -415,7 +466,11 @@ impl Field {
     pub fn debug(&self, prost_path: &Path, wrapper_name: TokenStream) -> TokenStream {
         // A fake field for generating the debug wrapper
         let key_wrapper = fake_scalar(self.key_ty.clone()).debug(prost_path, quote!(KeyWrapper));
-        let key = self.arena_key_type();
+        // Use 'a lifetime for debug wrapper instead of 'arena
+        let key = match &self.key_ty {
+            scalar::Ty::String => quote!(&'a str),
+            _ => self.key_ty.rust_ref_type(),
+        };
         let value_wrapper = self.value_ty.debug(prost_path);
 
         // In arena mode, we use ArenaMap for all maps
@@ -443,7 +498,12 @@ impl Field {
                     };
                 }
 
-                let value = ty.rust_type(prost_path);
+                // For arena mode, use the reference type with explicit lifetime
+                let value = match ty {
+                    scalar::Ty::String => quote!(&'a str),
+                    scalar::Ty::Bytes(_) => quote!(&'a [u8]),
+                    _ => ty.rust_ref_type(),
+                };
                 quote! {
                     struct #wrapper_name<'a>(&'a #prost_path::ArenaMap<'a, #key, #value>);
                     impl<'a> ::core::fmt::Debug for #wrapper_name<'a> {

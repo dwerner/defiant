@@ -3,6 +3,7 @@ use defiant_types::{
     FieldDescriptorProto,
 };
 
+use crate::descriptor_ext::*;
 use crate::extern_paths::ExternPaths;
 use crate::message_graph::MessageGraph;
 use crate::{BytesType, Config, MapType, ServiceGenerator};
@@ -29,7 +30,7 @@ impl<'a, 'arena> Context<'a, 'arena> {
         let prost_path_attribute = config
             .prost_path
             .as_deref()
-            .map(|prost_path| format!(r#"#[prost(prost_path = "{prost_path}")]"#));
+            .map(|prost_path| format!(r#"#[defiant(defiant_path = "{prost_path}")]"#));
 
         Self {
             config,
@@ -143,8 +144,8 @@ impl<'a, 'arena> Context<'a, 'arena> {
         // repeated field cannot derive Copy
         if field.label() == Label::Repeated {
             false
-        } else if field.r#type() == Type::Message {
-            // nested and boxed messages cannot derive Copy
+        } else if field.r#type() == Type::Message || field.r#type() == Type::Group {
+            // nested and boxed messages/groups cannot derive Copy
             if self
                 .message_graph
                 .is_nested(field.type_name(), fq_message_name)
@@ -159,6 +160,7 @@ impl<'a, 'arena> Context<'a, 'arena> {
             {
                 false
             } else {
+                // Recursively check if the message/group can derive Copy
                 self.can_message_derive_copy(field.type_name())
             }
         } else {

@@ -52,11 +52,15 @@ fn main() -> Result<()> {
     // that encode/decode roundtrips can use encoded output for comparison. Otherwise trying to
     // compare based on the Rust PartialEq implementations is difficult, due to presence of NaN
     // values.
+    //
+    // Compile well-known types locally instead of using defiant_types (which doesn't have wrappers)
     defiant_build::Config::new(&arena)
         .protoc_executable(&protoc_executable)
+        .compile_well_known_types()
         .btree_map(["."])
         .compile_protos(
             &[
+                proto_dir.join("google/protobuf/wrappers.proto"),
                 proto_dir.join("google/protobuf/test_messages_proto2.proto"),
                 proto_dir.join("google/protobuf/test_messages_proto3.proto"),
                 proto_dir.join("google/protobuf/unittest.proto"),
@@ -99,7 +103,7 @@ fn install_protoc_and_conformance_test_runner(
     let build_conformance = !cfg!(windows);
 
     // Build and install protoc, the protobuf libraries, and the conformance test runner.
-    cmake::Config::new(src_dir)
+    let cmake_build_dir = cmake::Config::new(src_dir)
         .define("CMAKE_CXX_STANDARD", "17")
         .define("ABSL_PROPAGATE_CXX_STD", "ON")
         .define("CMAKE_INSTALL_PREFIX", prefix_dir)
@@ -113,8 +117,11 @@ fn install_protoc_and_conformance_test_runner(
 
     if build_conformance {
         // Install the conformance-test-runner binary, since it isn't done automatically.
+        // The cmake build directory is where the binary is built before installation
         fs::copy(
-            build_dir.join("build").join("conformance_test_runner"),
+            cmake_build_dir
+                .join("build")
+                .join("conformance_test_runner"),
             prefix_dir.join("bin").join("conformance-test-runner"),
         )
         .context("failed to copy conformance-test-runner")?;

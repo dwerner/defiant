@@ -116,7 +116,7 @@ use alloc::vec::Vec;
 use anyhow::anyhow;
 use defiant::bytes::Buf;
 
-use defiant::Message;
+use defiant::{Encode, MessageView};
 
 pub enum RoundtripResult {
     /// The roundtrip succeeded.
@@ -152,13 +152,15 @@ impl RoundtripResult {
 
 /// Tests round-tripping a message type. The message should be compiled with `BTreeMap` fields,
 /// otherwise the comparison may fail due to inconsistent `HashMap` entry encoding ordering.
+///
+/// M should be a View type (e.g., TestAllTypesProto3, not TestAllTypesProto3Builder).
 pub fn roundtrip<'arena, M>(data: &[u8], arena: &'arena defiant::Arena) -> RoundtripResult
 where
-    M: Message<'arena>,
+    M: MessageView<'arena> + Encode + PartialEq,
 {
-    // Try to decode a message from the data. If decoding fails, continue.
-    let all_types = match M::decode(data, &arena) {
-        Ok(all_types) => all_types,
+    // Decode using the View's from_buf() helper which internally does decode + freeze
+    let all_types = match M::from_buf(data, arena) {
+        Ok(view) => view,
         Err(error) => return RoundtripResult::DecodeError(error),
     };
 
@@ -181,8 +183,8 @@ where
         ));
     }
 
-    let roundtrip = match M::decode(buf1.as_slice(), &arena) {
-        Ok(roundtrip) => roundtrip,
+    let roundtrip = match M::from_buf(buf1.as_slice(), arena) {
+        Ok(view) => view,
         Err(error) => return RoundtripResult::Error(anyhow!(error)),
     };
 
@@ -216,7 +218,7 @@ where
 /// Generic roundtrip serialization check for messages.
 pub fn check_message<'arena, M>(msg: &M, arena: &'arena defiant::Arena)
 where
-    M: Debug + Message<'arena> + PartialEq,
+    M: Debug + MessageView<'arena> + Encode + PartialEq,
 {
     let expected_len = msg.encoded_len();
 
@@ -225,7 +227,7 @@ where
     assert_eq!(expected_len, buf.len());
 
     let mut buf = buf.as_slice();
-    let roundtrip = M::decode(&mut buf, &arena).unwrap();
+    let roundtrip = M::from_buf(&mut buf, &arena).unwrap();
 
     assert!(
         !buf.has_remaining(),
@@ -236,10 +238,10 @@ where
 }
 
 /// Serialize from A should equal Serialize from B
-pub fn check_serialize_equivalent<'arena, M, N>(msg_a: &M, msg_b: &N)
+pub fn check_serialize_equivalent<M, N>(msg_a: &M, msg_b: &N)
 where
-    M: Message<'arena> + PartialEq,
-    N: Message<'arena> + PartialEq,
+    M: Encode + PartialEq,
+    N: Encode + PartialEq,
 {
     let mut buf_a = Vec::new();
     msg_a.encode(&mut buf_a).unwrap();

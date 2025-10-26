@@ -27,14 +27,8 @@ pub use crate::encoding::length_delimiter::{
     decode_length_delimiter, encode_length_delimiter, length_delimiter_len,
 };
 pub use crate::error::{DecodeError, EncodeError, UnknownEnumValue};
-pub use crate::message::Message;
+pub use crate::message::{Decode, Encode, MessageView};
 pub use crate::name::Name;
-
-/// Trait linking a view type to its builder type.
-pub trait MessageView<'arena> {
-    /// The builder type for constructing this view
-    type Builder;
-}
 
 // See `encoding::DecodeContext` for more info.
 // 100 is the default recursion limit in the C++ implementation.

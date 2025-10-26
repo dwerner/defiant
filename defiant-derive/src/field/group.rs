@@ -40,7 +40,7 @@ impl Field {
 
         if !unknown_attrs.is_empty() {
             bail!(
-                "unknown attribute(s) for group field: #[prost({})]",
+                "unknown attribute(s) for group field: #[defiant({})]",
                 quote!(#(#unknown_attrs),*)
             );
         }
@@ -75,7 +75,10 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                if let Some(ref msg) = #ident {
+                if let Some(msg) = #ident.as_ref() {
+                    // For scalar-only groups (stored by value), msg is &T
+                    // For arena groups (stored by ref), msg is &&'arena T, coerces to &T
+                    // group::encode expects &M, so pass msg directly
                     #prost_path::encoding::group::encode(#tag, msg, buf);
                 }
             },
@@ -92,21 +95,14 @@ impl Field {
 
     pub fn merge(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         match self.label {
-            Label::Optional => quote! {
-                #prost_path::encoding::group::merge(
-                    tag,
-                    wire_type,
-                    #ident.get_or_insert_with(::core::default::Default::default),
-                    buf,
-                    arena,
-                    ctx,
-                )
+            Label::Optional => {
+                panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");
             },
-            Label::Required => quote! {
-                #prost_path::encoding::group::merge(tag, wire_type, #ident, buf, arena, ctx)
+            Label::Required => {
+                panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");
             },
-            Label::Repeated => quote! {
-                #prost_path::encoding::group::merge_repeated(tag, wire_type, #ident, buf, arena, ctx)
+            Label::Repeated => {
+                panic!("Group field merge() should not be called - inline builder code should be generated in lib.rs");
             },
         }
     }
@@ -115,6 +111,8 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
+                // For scalar-only groups (stored by value), msg is &T
+                // For arena groups (stored by ref), msg is &&'arena T, coerces to &T
                 #ident.as_ref().map_or(0, |msg| #prost_path::encoding::group::encoded_len(#tag, msg))
             },
             Label::Required => quote! {

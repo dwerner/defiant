@@ -40,7 +40,7 @@ impl Field {
 
         if !unknown_attrs.is_empty() {
             bail!(
-                "unknown attribute(s) for message field: #[prost({})]",
+                "unknown attribute(s) for message field: #[defiant({})]",
                 quote!(#(#unknown_attrs),*)
             );
         }
@@ -75,8 +75,8 @@ impl Field {
         let tag = self.tag;
         match self.label {
             Label::Optional => quote! {
-                if let Some(msg) = #ident {
-                    use #prost_path::Message as _;
+                if let Some(msg) = #ident.as_ref() {
+                    use #prost_path::Encode as _;
                     #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
                     #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
                     msg.encode_raw(buf);
@@ -84,7 +84,7 @@ impl Field {
             },
             Label::Required => quote! {
                 {
-                    use #prost_path::Message as _;
+                    use #prost_path::Encode as _;
                     let msg = &(#ident);
                     #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
                     #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
@@ -93,7 +93,7 @@ impl Field {
             },
             Label::Repeated => quote! {
                 {
-                    use #prost_path::Message as _;
+                    use #prost_path::Encode as _;
                     for msg in #ident.iter() {
                         #prost_path::encoding::encode_key(#tag, #prost_path::encoding::WireType::LengthDelimited, buf);
                         #prost_path::encoding::encode_varint(msg.encoded_len() as u64, buf);
@@ -106,18 +106,16 @@ impl Field {
 
     pub fn merge(&self, prost_path: &Path, ident: TokenStream) -> TokenStream {
         match self.label {
-            Label::Optional => quote! {
-                #prost_path::encoding::message::merge(wire_type,
-                                                 #ident.get_or_insert_with(::core::default::Default::default),
-                                                 buf,
-                                                 arena,
-                                                 ctx)
+            Label::Optional => {
+                // This path should NOT be reached anymore - we generate inline builder code
+                // for all message fields in lib.rs. If this is reached, something is wrong.
+                panic!("Message field merge() should not be called - inline builder code should be generated in lib.rs");
             },
-            Label::Required => quote! {
-                #prost_path::encoding::message::merge(wire_type, #ident, buf, arena, ctx)
+            Label::Required => {
+                panic!("Message field merge() should not be called - inline builder code should be generated in lib.rs");
             },
-            Label::Repeated => quote! {
-                #prost_path::encoding::message::merge_repeated(wire_type, #ident, buf, arena, ctx)
+            Label::Repeated => {
+                panic!("Message field merge() should not be called - inline builder code should be generated in lib.rs");
             },
         }
     }
@@ -127,7 +125,7 @@ impl Field {
         match self.label {
             Label::Optional => quote! {
                 {
-                    use #prost_path::Message as _;
+                    use #prost_path::Encode as _;
                     match &#ident {
                         Some(msg) => {
                             let len: usize = msg.encoded_len();
@@ -139,14 +137,14 @@ impl Field {
             },
             Label::Required => quote! {
                 {
-                    use #prost_path::Message as _;
+                    use #prost_path::Encode as _;
                     let len = (#ident).encoded_len();
                     #prost_path::encoding::key_len(#tag) + #prost_path::encoding::encoded_len_varint(len as u64) + len
                 }
             },
             Label::Repeated => quote! {
                 {
-                    use #prost_path::Message as _;
+                    use #prost_path::Encode as _;
                     #prost_path::encoding::key_len(#tag) * #ident.len()
                         + #ident
                             .iter()

@@ -46,7 +46,7 @@ impl Field {
 
         if !unknown_attrs.is_empty() {
             bail!(
-                "unknown attribute(s) for message field: #[prost({})]",
+                "unknown attribute(s) for message field: #[defiant({})]",
                 quote!(#(#unknown_attrs),*)
             );
         }

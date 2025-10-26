@@ -5,7 +5,7 @@ impl<'arena> Any<'arena> {
     /// Serialize the given message type `M` as [`Any`].
     pub fn from_msg<M>(msg: &M, arena: &'arena Arena) -> Result<Any<'arena>, EncodeError>
     where
-        M: Name + Message<'arena>,
+        M: Name + Encode,
     {
         let type_url_string = M::type_url();
         let type_url = arena.alloc_str(&type_url_string);
@@ -20,7 +20,7 @@ impl<'arena> Any<'arena> {
     /// the expected type URL.
     pub fn to_msg<M>(&self, arena: &'arena Arena) -> Result<M, DecodeError>
     where
-        M: Message<'arena> + Name + Sized,
+        M: Decode<'arena> + Name + Sized,
     {
         let expected_type_url = M::type_url();
 

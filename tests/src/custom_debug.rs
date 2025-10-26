@@ -17,8 +17,8 @@ impl fmt::Debug for Msg {
 #[test]
 fn tuple_struct_custom_debug() {
     #[derive(Clone, PartialEq, defiant::Message)]
-    #[prost(skip_debug)]
-    struct NewType(#[prost(enumeration = "AnEnum", tag = "5")] i32);
+    #[defiant(skip_debug)]
+    struct NewType(#[defiant(enumeration = "AnEnum", tag = "5")] i32);
     impl fmt::Debug for NewType {
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             f.write_str("NewType(custom_debug)")
@@ -32,13 +32,13 @@ fn tuple_struct_custom_debug() {
 }
 
 #[derive(Clone, PartialEq, prost::Oneof)]
-#[prost(skip_debug)]
+#[defiant(skip_debug)]
 pub enum OneofWithEnumCustomDebug {
-    #[prost(int32, tag = "8")]
+    #[defiant(int32, tag = "8")]
     Int(i32),
-    #[prost(string, tag = "9")]
+    #[defiant(string, tag = "9")]
     String(String),
-    #[prost(enumeration = "BasicEnumeration", tag = "10")]
+    #[defiant(enumeration = "BasicEnumeration", tag = "10")]
     Enumeration(i32),
 }
 impl fmt::Debug for OneofWithEnumCustomDebug {
@@ -48,9 +48,9 @@ impl fmt::Debug for OneofWithEnumCustomDebug {
 }
 
 #[derive(Clone, PartialEq, defiant::Message)]
-#[prost(skip_debug)]
+#[defiant(skip_debug)]
 struct MessageWithOneofCustomDebug {
-    #[prost(oneof = "OneofWithEnumCustomDebug", tags = "8, 9, 10")]
+    #[defiant(oneof = "OneofWithEnumCustomDebug", tags = "8, 9, 10")]
     of: Option<OneofWithEnumCustomDebug>,
 }
 

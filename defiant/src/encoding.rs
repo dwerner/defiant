@@ -12,7 +12,6 @@ use core::str;
 use ::bytes::{Buf, BufMut, Bytes};
 
 use crate::DecodeError;
-use crate::Message;
 
 pub mod varint;
 pub use varint::{decode_varint, encode_varint, encoded_len_varint};
@@ -767,10 +766,11 @@ pub mod bytes {
 pub mod message {
     use super::*;
     use crate::Arena;
+    use crate::{Encode, Decode};
 
-    pub fn encode<'a, M>(tag: u32, msg: &M, buf: &mut impl BufMut)
+    pub fn encode<M>(tag: u32, msg: &M, buf: &mut impl BufMut)
     where
-        M: Message<'a>,
+        M: Encode,
     {
         encode_key(tag, WireType::LengthDelimited, buf);
         encode_varint(msg.encoded_len() as u64, buf);
@@ -785,7 +785,7 @@ pub mod message {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message<'arena>,
+        M: Decode<'arena>,
         B: Buf,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
@@ -803,7 +803,7 @@ pub mod message {
 
     pub fn encode_repeated<M>(tag: u32, messages: &[M], buf: &mut impl BufMut)
     where
-        M: for<'a> Message<'a>,
+        M: Encode,
     {
         for msg in messages {
             encode(tag, msg, buf);
@@ -812,13 +812,13 @@ pub mod message {
 
     pub fn merge_repeated<'arena, M>(
         wire_type: WireType,
-        messages: &mut Vec<M>,
+        messages: &mut crate::arena::ArenaVec<'arena, M>,
         buf: &mut impl Buf,
         arena: &'arena Arena,
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message<'arena>,
+        M: Decode<'arena>,
     {
         check_wire_type(WireType::LengthDelimited, wire_type)?;
         let mut msg = M::new_in(arena);
@@ -828,18 +828,18 @@ pub mod message {
     }
 
     #[inline]
-    pub fn encoded_len<'a, M>(tag: u32, msg: &M) -> usize
+    pub fn encoded_len<M>(tag: u32, msg: &M) -> usize
     where
-        M: Message<'a>,
+        M: Encode,
     {
         let len = msg.encoded_len();
         key_len(tag) + encoded_len_varint(len as u64) + len
     }
 
     #[inline]
-    pub fn encoded_len_repeated<'a, M>(tag: u32, messages: &[M]) -> usize
+    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M]) -> usize
     where
-        M: Message<'a>,
+        M: Encode,
     {
         key_len(tag) * messages.len()
             + messages
@@ -853,10 +853,11 @@ pub mod message {
 pub mod group {
     use super::*;
     use crate::Arena;
+    use crate::{Encode, Decode};
 
-    pub fn encode<'a, M>(tag: u32, msg: &M, buf: &mut impl BufMut)
+    pub fn encode<M>(tag: u32, msg: &M, buf: &mut impl BufMut)
     where
-        M: Message<'a>,
+        M: Encode,
     {
         encode_key(tag, WireType::StartGroup, buf);
         msg.encode_raw(buf);
@@ -872,7 +873,7 @@ pub mod group {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message<'arena>,
+        M: Decode<'arena>,
     {
         check_wire_type(WireType::StartGroup, wire_type)?;
 
@@ -890,9 +891,9 @@ pub mod group {
         }
     }
 
-    pub fn encode_repeated<'a, M>(tag: u32, messages: &[M], buf: &mut impl BufMut)
+    pub fn encode_repeated<M>(tag: u32, messages: &[M], buf: &mut impl BufMut)
     where
-        M: Message<'a>,
+        M: Encode,
     {
         for msg in messages {
             encode(tag, msg, buf);
@@ -908,7 +909,7 @@ pub mod group {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        M: Message<'arena>,
+        M: Decode<'arena>,
     {
         check_wire_type(WireType::StartGroup, wire_type)?;
         let mut msg = M::new_in(arena);
@@ -918,19 +919,19 @@ pub mod group {
     }
 
     #[inline]
-    pub fn encoded_len<'a, M>(tag: u32, msg: &M) -> usize
+    pub fn encoded_len<M>(tag: u32, msg: &M) -> usize
     where
-        M: Message<'a>,
+        M: Encode,
     {
         2 * key_len(tag) + msg.encoded_len()
     }
 
     #[inline]
-    pub fn encoded_len_repeated<'a, M>(tag: u32, messages: &[M]) -> usize
+    pub fn encoded_len_repeated<M>(tag: u32, messages: &[M]) -> usize
     where
-        M: Message<'a>,
+        M: Encode,
     {
-        2 * key_len(tag) * messages.len() + messages.iter().map(Message::encoded_len).sum::<usize>()
+        2 * key_len(tag) * messages.len() + messages.iter().map(Encode::encoded_len).sum::<usize>()
     }
 }
 
@@ -945,31 +946,11 @@ pub mod arena_map {
     /// Generic protobuf map merge function for arena-allocated maps.
     ///
     /// Accumulates entries into a ArenaVec during decoding.
-    pub fn merge<'arena, K, V, B, KM, VM>(
+    /// Caller must provide initial key and value instances.
+    pub fn merge_with_defaults<'arena, K, V, B, KM, VM>(
         key_merge: KM,
         val_merge: VM,
-        values: &mut ArenaVec<'arena, (K, V)>,
-        buf: &mut B,
-        arena: &'arena crate::Arena,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError>
-    where
-        K: Default,
-        V: Default,
-        B: Buf,
-        KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
-        VM: Fn(WireType, &mut V, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
-    {
-        merge_with_default(key_merge, val_merge, V::default(), values, buf, arena, ctx)
-    }
-
-    /// Generic protobuf map merge function with an overridden value default.
-    ///
-    /// This is necessary because enumeration values can have a default value other
-    /// than 0 in proto2.
-    pub fn merge_with_default<'arena, K, V, B, KM, VM>(
-        key_merge: KM,
-        val_merge: VM,
+        key_default: K,
         val_default: V,
         values: &mut ArenaVec<'arena, (K, V)>,
         buf: &mut B,
@@ -977,12 +958,11 @@ pub mod arena_map {
         ctx: DecodeContext,
     ) -> Result<(), DecodeError>
     where
-        K: Default,
         B: Buf,
         KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
         VM: Fn(WireType, &mut V, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
     {
-        let mut key = Default::default();
+        let mut key = key_default;
         let mut val = val_default;
         ctx.limit_reached()?;
         merge_loop(
@@ -1003,37 +983,29 @@ pub mod arena_map {
         Ok(())
     }
 
-    /// Generic protobuf map encode function for arena-allocated maps.
+    /// Map merge function for message values - DEPRECATED
     ///
-    /// Encodes from a slice (typically from ArenaMap).
-    pub fn encode<K, V, B, KE, KL, VE, VL>(
-        key_encode: KE,
-        key_encoded_len: KL,
-        val_encode: VE,
-        val_encoded_len: VL,
-        tag: u32,
-        values: &[(K, V)],
-        buf: &mut B,
-    ) where
-        K: Default + PartialEq,
-        V: Default + PartialEq,
-        B: BufMut,
-        KE: Fn(u32, &K, &mut B),
-        KL: Fn(u32, &K) -> usize,
-        VE: Fn(u32, &V, &mut B),
-        VL: Fn(u32, &V) -> usize,
+    /// This function is no longer used. Map fields with message values now use
+    /// custom inline merge code generated in the proc macro to handle Builder/View types properly.
+    pub fn merge_message<'arena, K, VBuilder, VView, B, KM, VM, VN, VF>(
+        _key_merge: KM,
+        _val_merge: VM,
+        _val_new: VN,
+        _val_freeze: VF,
+        _key_default: K,
+        _values: &mut ArenaVec<'arena, (K, VView)>,
+        _buf: &mut B,
+        _arena: &'arena crate::Arena,
+        _ctx: DecodeContext,
+    ) -> Result<(), DecodeError>
+    where
+        B: Buf,
+        KM: Fn(WireType, &mut K, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+        VM: Fn(WireType, &mut VBuilder, &mut B, &'arena crate::Arena, DecodeContext) -> Result<(), DecodeError>,
+        VN: Fn(&'arena crate::Arena) -> VBuilder,
+        VF: Fn(VBuilder) -> VView,
     {
-        encode_with_defaults(
-            key_encode,
-            key_encoded_len,
-            val_encode,
-            val_encoded_len,
-            &K::default(),
-            &V::default(),
-            tag,
-            values,
-            buf,
-        )
+        panic!("merge_message is deprecated - use custom inline merge code instead")
     }
 
     /// Generic protobuf map encode function with overridden key and value defaults.
@@ -1074,23 +1046,43 @@ pub mod arena_map {
         }
     }
 
-    /// Generic protobuf map encoded length function for arena-allocated maps.
-    pub fn encoded_len<K, V, KL, VL>(
+    /// Generic protobuf map encode function for message values that don't implement Default.
+    ///
+    /// Always encodes all values (no default-value optimization for messages).
+    pub fn encode_message<K, V, B, KE, KL, VE, VL>(
+        key_encode: KE,
         key_encoded_len: KL,
+        val_encode: VE,
         val_encoded_len: VL,
+        key_default: &K,
         tag: u32,
         values: &[(K, V)],
-    ) -> usize
-    where
-        K: Default + PartialEq,
-        V: Default + PartialEq,
+        buf: &mut B,
+    ) where
+        K: PartialEq,
+        B: BufMut,
+        KE: Fn(u32, &K, &mut B),
         KL: Fn(u32, &K) -> usize,
+        VE: Fn(u32, &V, &mut B),
         VL: Fn(u32, &V) -> usize,
     {
-        encoded_len_with_defaults(key_encoded_len, val_encoded_len, &K::default(), &V::default(), tag, values)
+        for (key, val) in values.iter() {
+            let skip_key = key == key_default;
+
+            let len = (if skip_key { 0 } else { key_encoded_len(1, key) })
+                + val_encoded_len(2, val);
+
+            encode_key(tag, WireType::LengthDelimited, buf);
+            encode_varint(len as u64, buf);
+            if !skip_key {
+                key_encode(1, key, buf);
+            }
+            // Always encode the value (no default comparison for messages)
+            val_encode(2, val, buf);
+        }
     }
 
-    /// Generic protobuf map encoded length function with overridden key and value defaults.
+    /// Generic protobuf map encoded length function with key and value defaults.
     pub fn encoded_len_with_defaults<K, V, KL, VL>(
         key_encoded_len: KL,
         val_encoded_len: VL,
@@ -1118,6 +1110,37 @@ pub mod arena_map {
                     } else {
                         val_encoded_len(2, val)
                     });
+                    encoded_len_varint(len as u64) + len
+                })
+                .sum::<usize>()
+    }
+
+    /// Map encoded length function for message values that don't implement Default.
+    ///
+    /// Always encodes all values (no default-value optimization for messages).
+    pub fn encoded_len_message<K, V, KL, VL>(
+        key_encoded_len: KL,
+        val_encoded_len: VL,
+        key_default: &K,
+        tag: u32,
+        values: &[(K, V)],
+    ) -> usize
+    where
+        K: PartialEq,
+        KL: Fn(u32, &K) -> usize,
+        VL: Fn(u32, &V) -> usize,
+    {
+        key_len(tag) * values.len()
+            + values
+                .iter()
+                .map(|(key, val)| {
+                    // Always encode the value (no default comparison for messages)
+                    // Only skip the key if it equals the key default
+                    let len = (if key == key_default {
+                        0
+                    } else {
+                        key_encoded_len(1, key)
+                    }) + val_encoded_len(2, val);
                     encoded_len_varint(len as u64) + len
                 })
                 .sum::<usize>()

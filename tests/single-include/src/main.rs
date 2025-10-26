@@ -7,7 +7,7 @@ fn main() {
         builder.set_query("test");
         builder.set_page_number(1);
         builder.set_result_per_page(10);
-        builder.into_view()
+        builder.freeze()
     };
 
     let _out_dir_test = {
@@ -15,6 +15,6 @@ fn main() {
         builder.set_query("test");
         builder.set_page_number(1);
         builder.set_result_per_page(10);
-        builder.into_view()
+        builder.freeze()
     };
 }

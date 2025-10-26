@@ -14,8 +14,9 @@ use syn::punctuated::Punctuated;
 use syn::Path;
 use syn::{Attribute, Expr, ExprLit, Lit, LitBool, LitInt, Meta, MetaNameValue, Token};
 
-// Re-export Ty for use in lib.rs
+// Re-export Ty and ValueTy for use in lib.rs
 pub(crate) use scalar::Ty;
+pub(crate) use map::ValueTy;
 
 #[derive(Clone)]
 pub enum Field {
@@ -250,12 +251,12 @@ impl fmt::Display for Label {
     }
 }
 
-/// Get the items belonging to the 'prost' list attribute, e.g. `#[prost(foo, bar="baz")]`.
+/// Get the items belonging to the 'prost' list attribute, e.g. `#[defiant(foo, bar="baz")]`.
 fn prost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
     let mut result = Vec::new();
     for attr in attrs.iter() {
         if let Meta::List(meta_list) = &attr.meta {
-            if meta_list.path.is_ident("prost") {
+            if meta_list.path.is_ident("defiant") {
                 result.extend(
                     meta_list
                         .parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?

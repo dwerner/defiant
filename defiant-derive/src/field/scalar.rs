@@ -48,7 +48,7 @@ impl Field {
 
         if !unknown_attrs.is_empty() {
             bail!(
-                "unknown attribute(s): #[prost({})]",
+                "unknown attribute(s): #[defiant({})]",
                 quote!(#(#unknown_attrs),*)
             );
         }
@@ -365,7 +365,7 @@ impl Field {
             },
             Kind::Repeated | Kind::Packed => {
                 quote! {
-                    struct #wrapper_name<'a>(&'a #prost_path::alloc::vec::Vec<#inner_ty>);
+                    struct #wrapper_name<'a>(&'a [#inner_ty]);
                     impl<'a> ::core::fmt::Debug for #wrapper_name<'a> {
                         fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                             let mut vec_builder = f.debug_list();

@@ -1,5 +1,4 @@
 pub use crate::error::{DecodeError, EncodeError, UnknownEnumValue};
-pub use crate::message::Message;
 pub use crate::name::Name;
 
 use bytes::{Buf, BufMut};

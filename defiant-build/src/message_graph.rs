@@ -9,6 +9,8 @@ use defiant_types::{
     DescriptorProto, FileDescriptorProto,
 };
 
+use crate::descriptor_ext::*;
+
 /// `MessageGraph` builds a graph of messages whose edges correspond to nesting.
 /// The goal is to recognize when message types are recursively nested, so
 /// that fields can be boxed when necessary.
@@ -57,12 +59,12 @@ impl<'arena> MessageGraph<'arena> {
     /// To allow recursive messages, the message graph is used to detect recursion and automatically box the recursive field.
     /// Since repeated messages are already put in a Vec, boxing them isn’t necessary even if the reference is recursive.
     fn add_message(&mut self, package: &str, msg: &DescriptorProto<'arena>) {
-        let msg_name = format!("{}.{}", package, msg.name.as_ref().unwrap());
+        let msg_name = format!("{}.{}", package, msg.name());
         let msg_index = self.get_or_insert_index(msg_name.clone());
 
         for field in msg.field {
             if field.r#type() == Type::Message && field.label() != Label::Repeated {
-                let field_index = self.get_or_insert_index(field.type_name.unwrap().to_string());
+                let field_index = self.get_or_insert_index(field.type_name().to_string());
                 self.graph.add_edge(msg_index, field_index, ());
             }
         }

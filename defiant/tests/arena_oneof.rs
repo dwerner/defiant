@@ -19,166 +19,35 @@
 //! }
 //! ```
 
-use defiant::{Arena, DecodeError, Message};
-use defiant::encoding::{DecodeContext, WireType, string, int32, message};
-use bytes::{Buf, BufMut};
+use defiant::{Arena, Message, Oneof, Encode, Decode};
 
 /// Image message
-#[derive(Debug, Clone)]
+#[derive(Clone, PartialEq, Message)]
 struct Image<'arena> {
+    #[defiant(string, tag = 1)]
     url: &'arena str,
+    #[defiant(int32, tag = 2)]
     width: i32,
+    #[defiant(int32, tag = 3)]
     height: i32,
 }
 
-impl<'arena> Default for Image<'arena> {
-    fn default() -> Self {
-        Image {
-            url: "",
-            width: 0,
-            height: 0,
-        }
-    }
-}
-
-impl<'arena> Message<'arena> for Image<'arena> {
-    fn new_in(_arena: &'arena Arena) -> Self {
-        Image {
-            url: "",
-            width: 0,
-            height: 0,
-        }
-    }
-
-    fn encode_raw(&self, buf: &mut impl BufMut) {
-        if !self.url.is_empty() {
-            string::encode(1, &self.url.to_string(), buf);
-        }
-        if self.width != 0 {
-            int32::encode(2, &self.width, buf);
-        }
-        if self.height != 0 {
-            int32::encode(3, &self.height, buf);
-        }
-    }
-
-    fn merge_field(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        buf: &mut impl Buf,
-        arena: &'arena Arena,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        match tag {
-            1 => {
-                self.url = string::merge_arena(wire_type, buf, arena, ctx)?;
-                Ok(())
-            }
-            2 => int32::merge(wire_type, &mut self.width, buf, ctx),
-            3 => int32::merge(wire_type, &mut self.height, buf, ctx),
-            _ => defiant::encoding::skip_field(wire_type, tag, buf, ctx),
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        let mut len = 0;
-        if !self.url.is_empty() {
-            len += string::encoded_len(1, &self.url.to_string());
-        }
-        if self.width != 0 {
-            len += int32::encoded_len(2, &self.width);
-        }
-        if self.height != 0 {
-            len += int32::encoded_len(3, &self.height);
-        }
-        len
-    }
-
-}
-
-/// Oneof enum - holds values directly
-#[derive(Debug)]
-enum Payload<'arena> {
-    Text(&'arena str),
-    Image(Image<'arena>),
-    Count(i32),
-}
-
 /// Notification with oneof field
-#[derive(Debug)]
+#[derive(Message)]
 struct Notification<'arena> {
+    #[defiant(oneof = "Payload", tags = "1, 2, 3")]
     payload: Option<Payload<'arena>>,
 }
 
-impl<'arena> Default for Notification<'arena> {
-    fn default() -> Self {
-        Notification { payload: None }
-    }
-}
-
-impl<'arena> Message<'arena> for Notification<'arena> {
-    fn new_in(_arena: &'arena Arena) -> Self {
-        Notification { payload: None }
-    }
-
-    fn encode_raw(&self, buf: &mut impl BufMut) {
-        match &self.payload {
-            Some(Payload::Text(text)) => {
-                string::encode(1, &text.to_string(), buf);
-            }
-            Some(Payload::Image(image)) => {
-                message::encode(2, image, buf);
-            }
-            Some(Payload::Count(count)) => {
-                int32::encode(3, count, buf);
-            }
-            None => {}
-        }
-    }
-
-    fn merge_field(
-        &mut self,
-        tag: u32,
-        wire_type: WireType,
-        buf: &mut impl Buf,
-        arena: &'arena Arena,
-        ctx: DecodeContext,
-    ) -> Result<(), DecodeError> {
-        match tag {
-            1 => {
-                // Decode text variant
-                let text = string::merge_arena(wire_type, buf, arena, ctx)?;
-                self.payload = Some(Payload::Text(text));
-                Ok(())
-            }
-            2 => {
-                // Decode image variant
-                let mut image = Image::default();
-                message::merge(wire_type, &mut image, buf, arena, ctx)?;
-                self.payload = Some(Payload::Image(image));
-                Ok(())
-            }
-            3 => {
-                // Decode count variant
-                let mut count = 0;
-                int32::merge(wire_type, &mut count, buf, ctx)?;
-                self.payload = Some(Payload::Count(count));
-                Ok(())
-            }
-            _ => defiant::encoding::skip_field(wire_type, tag, buf, ctx),
-        }
-    }
-
-    fn encoded_len(&self) -> usize {
-        match &self.payload {
-            Some(Payload::Text(text)) => string::encoded_len(1, &text.to_string()),
-            Some(Payload::Image(image)) => message::encoded_len(2, image),
-            Some(Payload::Count(count)) => int32::encoded_len(3, count),
-            None => 0,
-        }
-    }
-
+/// Oneof enum - holds values directly
+#[derive(Clone, PartialEq, Oneof)]
+enum Payload<'arena> {
+    #[defiant(string, tag = 1)]
+    Text(&'arena str),
+    #[defiant(message, tag = 2)]
+    Image(Image<'arena>),
+    #[defiant(int32, tag = 3)]
+    Count(i32),
 }
 
 #[test]
@@ -192,8 +61,8 @@ fn test_oneof_text() {
     let encoded = notification.encode_to_vec();
     println!("Encoded text variant: {} bytes", encoded.len());
 
-    let decoded = Notification::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode");
+    let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
+        .expect("Failed to decode").freeze();
 
     match decoded.payload {
         Some(Payload::Text(text)) => {
@@ -220,8 +89,8 @@ fn test_oneof_image() {
     let encoded = notification.encode_to_vec();
     println!("Encoded image variant: {} bytes", encoded.len());
 
-    let decoded = Notification::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode");
+    let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
+        .expect("Failed to decode").freeze();
 
     match decoded.payload {
         Some(Payload::Image(image)) => {
@@ -244,8 +113,8 @@ fn test_oneof_count() {
     };
 
     let encoded = notification.encode_to_vec();
-    let decoded = Notification::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode");
+    let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
+        .expect("Failed to decode").freeze();
 
     match decoded.payload {
         Some(Payload::Count(count)) => {
@@ -262,8 +131,8 @@ fn test_oneof_none() {
     let notification = Notification { payload: None };
 
     let encoded = notification.encode_to_vec();
-    let decoded = Notification::decode(encoded.as_slice(), &arena)
-        .expect("Failed to decode");
+    let decoded = NotificationBuilder::decode(encoded.as_slice(), &arena)
+        .expect("Failed to decode").freeze();
 
     assert!(decoded.payload.is_none());
 }
@@ -276,11 +145,11 @@ fn test_oneof_last_wins() {
 
     // Manually construct a message with multiple oneof fields set
     let mut buf = Vec::new();
-    string::encode(1, &"first".to_string(), &mut buf);  // text
-    int32::encode(3, &100, &mut buf);  // count
+    defiant::encoding::string::encode(1, "first", &mut buf);  // text
+    defiant::encoding::int32::encode(3, &100, &mut buf);  // count
 
-    let decoded = Notification::decode(buf.as_slice(), &arena)
-        .expect("Failed to decode");
+    let decoded = NotificationBuilder::decode(buf.as_slice(), &arena)
+        .expect("Failed to decode").freeze();
 
     // The last field (count) should win
     match decoded.payload {
