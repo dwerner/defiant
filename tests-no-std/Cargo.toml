@@ -1,0 +1,38 @@
+[package]
+name = "tests-no-std"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+authors.workspace = true
+
+build = "../tests/build.rs"
+
+[lib]
+doctest = false
+path = "../tests/src/lib.rs"
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(feature, values("edition-2015", "std"))'] }
+
+# Compile the `tests` crate *without* the std feature, which is implicitly
+# omitted from the default crate features. It would be easier to do something
+# like `cargo test -p tests --no-default-features`, but that currently does not
+# do the right thing (see [1] for more context).
+# [1]: https://github.com/rust-lang/cargo/pull/8074
+
+[dependencies]
+anyhow = { version = "1.0.45", default-features = false }
+cfg-if = "1"
+defiant = { path = "../defiant", default-features = false, features = ["derive"] }
+defiant-types = { path = "../defiant-types", default-features = false }
+
+[dev-dependencies]
+defiant-build = { path = "../defiant-build" }
+tempfile = "3"
+protobuf = { path = "../protobuf" }
+
+[build-dependencies]
+cfg-if = "1"
+env_logger = { version = "0.11", default-features = false }
+defiant = { path = "../defiant" }
+defiant-build = { path = "../defiant-build" }

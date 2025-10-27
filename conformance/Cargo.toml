@@ -1,0 +1,13 @@
+[package]
+name = "conformance"
+version = "0.0.0"
+publish = false
+edition.workspace = true
+authors.workspace = true
+
+[dependencies]
+bytes = "1"
+env_logger = { version = "0.11", default-features = false }
+defiant = { path = "../defiant" }
+protobuf = { path = "../protobuf" }
+tests = { path = "../tests" }

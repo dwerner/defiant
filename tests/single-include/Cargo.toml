@@ -1,0 +1,14 @@
+[package]
+name = "single_include"
+version = "0.1.0"
+authors = ["Cameron Dart <cdart2@illinois.edu>"]
+edition = "2021"
+publish = false
+license = "MIT"
+
+[dependencies]
+defiant = { path = "../../defiant" }
+
+[build-dependencies]
+defiant = { path = "../../defiant" }
+defiant-build = { path = "../../defiant-build" }

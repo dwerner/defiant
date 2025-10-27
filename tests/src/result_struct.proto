@@ -1,0 +1,7 @@
+syntax = "proto3";
+package result_struct;
+
+message Result {
+  string msg = 1;
+}
+

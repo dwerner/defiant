@@ -1,0 +1,10 @@
+syntax = "proto3";
+package result_enum;
+
+enum Result {
+  HELLO = 0;
+}
+
+message FailMessage {
+  Result result = 1;
+}

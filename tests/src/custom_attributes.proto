@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package custom_attributes;
+
+message Msg {
+	oneof field {
+        string a = 1;
+        bytes b = 2;
+    }
+}
+
+enum AnEnum {
+	A = 0;
+	B = 1;
+}
+
+enum AnotherEnum {
+	C = 0;
+	D = 2;
+}

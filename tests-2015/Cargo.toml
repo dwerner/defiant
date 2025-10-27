@@ -1,0 +1,34 @@
+[package]
+name = "tests-2015"
+version = "0.0.0"
+publish = false
+edition = "2015"
+authors.workspace = true
+
+build = "../tests/build.rs"
+
+[lib]
+doctest = false
+path = "../tests/src/lib.rs"
+
+[features]
+default = ["edition-2015", "std"]
+edition-2015 = []
+std = []
+
+[dependencies]
+anyhow = "1.0.1"
+cfg-if = "1"
+defiant = { path = "../defiant" }
+defiant-types = { path = "../defiant-types" }
+protobuf = { path = "../protobuf" }
+
+[dev-dependencies]
+defiant-build = { path = "../defiant-build" }
+tempfile = "3"
+
+[build-dependencies]
+cfg-if = "1"
+env_logger = { version = "0.11", default-features = false }
+defiant = { path = "../defiant" }
+defiant-build = { path = "../defiant-build" }

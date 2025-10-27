@@ -1,0 +1,28 @@
+pub trait CustomType: defiant::Message + Default + core::fmt::Debug {}
+
+impl CustomType for u64 {}
+
+#[derive(Clone, prost::Oneof)]
+enum GenericEnum<A: CustomType> {
+    #[defiant(message, tag = "1")]
+    Data(GenericMessage<A>),
+    #[defiant(uint64, tag = "2")]
+    #[allow(dead_code)]
+    Number(u64),
+}
+
+#[derive(Clone, defiant::Message)]
+struct GenericMessage<A: CustomType> {
+    #[defiant(message, tag = "1")]
+    data: Option<A>,
+}
+
+#[test]
+fn generic_enum() {
+    let msg = GenericMessage { data: Some(100u64) };
+    let enumeration = GenericEnum::Data(msg);
+    match enumeration {
+        GenericEnum::Data(d) => assert_eq!(100, d.data.unwrap()),
+        GenericEnum::Number(_) => panic!("Not supposed to reach"),
+    }
+}

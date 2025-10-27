@@ -1,0 +1,37 @@
+[workspace]
+members = [
+  "benchmarks",
+  "conformance",
+  "defiant",
+  "defiant-build",
+  "defiant-derive",
+  "defiant-types",
+  "protobuf",
+  "tests",
+  "tests-2015",
+  "tests-2018",
+  "tests-2024",
+  "tests-no-std",
+  "tests/defiant-path",
+  "tests/reexported-defiant",
+  "tests/single-include",
+  "fuzz",
+]
+
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+authors = [
+  "Dan Burkert <dan@danburkert.com>",
+  "Lucio Franco <luciofranco14@gmail.com>",
+  "Casper Meijn <casper@meijn.net>",
+  "Tokio Contributors <team@tokio.rs>",
+]
+license = "Apache-2.0"
+repository = "https://github.com/dwerner/defiant"
+rust-version = "1.71.1"
+edition = "2021"
+
+[profile.bench]
+debug = true
