@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package prost_path;
+package defiant_path;
 
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/struct.proto";

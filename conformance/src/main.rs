@@ -13,6 +13,7 @@ use tests::{roundtrip, RoundtripResult};
 fn main() -> io::Result<()> {
     env_logger::init();
     let mut bytes = vec![0; 4];
+    let arena = defiant::Arena::new();
 
     loop {
         bytes.resize(4, 0);
@@ -27,14 +28,14 @@ fn main() -> io::Result<()> {
         bytes.resize(len, 0);
         io::stdin().read_exact(&mut bytes)?;
 
-        let result = match ConformanceRequest::decode(bytes.as_slice()) {
-            Ok(request) => handle_request(request),
+        let result = match ConformanceRequest::from_buf(bytes.as_slice(), &arena) {
+            Ok(request) => handle_request(&arena, request),
             Err(error) => conformance_response::Result::ParseError(format!("{error:?}")),
         };
 
-        let response = ConformanceResponse {
-            result: Some(result),
-        };
+        let mut response_builder = protobuf::conformance::ConformanceResponseBuilder::new_in(&arena);
+        response_builder.set_result(Some(result));
+        let response = response_builder.freeze();
 
         let len = response.encoded_len();
         bytes.clear();
@@ -45,10 +46,12 @@ fn main() -> io::Result<()> {
         let mut stdout = io::stdout();
         stdout.lock().write_all(&bytes)?;
         stdout.flush()?;
+
+        arena.reset();
     }
 }
 
-fn handle_request(request: ConformanceRequest) -> conformance_response::Result {
+fn handle_request<'arena>(arena: &'arena defiant::Arena, request: ConformanceRequest<'arena>) -> conformance_response::Result<'arena> {
     match request.requested_output_format() {
         WireFormat::Unspecified => {
             return conformance_response::Result::ParseError(
@@ -94,8 +97,8 @@ fn handle_request(request: ConformanceRequest) -> conformance_response::Result {
     };
 
     let roundtrip = match request.message_type.as_str() {
-        "protobuf_test_messages.proto2.TestAllTypesProto2" => roundtrip::<TestAllTypesProto2>(&buf),
-        "protobuf_test_messages.proto3.TestAllTypesProto3" => roundtrip::<TestAllTypesProto3>(&buf),
+        "protobuf_test_messages.proto2.TestAllTypesProto2" => roundtrip::<TestAllTypesProto2>(&buf, arena),
+        "protobuf_test_messages.proto3.TestAllTypesProto3" => roundtrip::<TestAllTypesProto3>(&buf, arena),
         _ => {
             return conformance_response::Result::ParseError(format!(
                 "unknown message type: {}",

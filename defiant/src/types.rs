@@ -514,8 +514,7 @@ impl Encode for () {
 }
 
 impl Decode<'_> for () {
-    fn new_in(_arena: &Arena) -> Self {
-    }
+    fn new_in(_arena: &Arena) -> Self {}
     fn merge_field(
         &mut self,
         tag: u32,
