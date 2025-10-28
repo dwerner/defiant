@@ -69,7 +69,7 @@ fn bootstrap() {
     let src = Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .expect("no parent")
-        .join("prost-types")
+        .join("defiant-types")
         .join("src");
 
     assert_eq_bootstrapped_file!(
