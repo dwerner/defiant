@@ -1,10 +1,10 @@
 use std::io::{self, Read, Write};
 
 use bytes::{Buf, BufMut};
-use defiant::Message;
+use defiant::Encode;
 
 use protobuf::conformance::{
-    conformance_request, conformance_response, ConformanceRequest, ConformanceResponse, WireFormat,
+    conformance_request, conformance_response, ConformanceRequest, WireFormat,
 };
 use protobuf::test_messages::proto2::TestAllTypesProto2;
 use protobuf::test_messages::proto3::TestAllTypesProto3;
@@ -13,7 +13,7 @@ use tests::{roundtrip, RoundtripResult};
 fn main() -> io::Result<()> {
     env_logger::init();
     let mut bytes = vec![0; 4];
-    let arena = defiant::Arena::new();
+    let mut arena = defiant::Arena::new();
 
     loop {
         bytes.resize(4, 0);
@@ -30,10 +30,14 @@ fn main() -> io::Result<()> {
 
         let result = match ConformanceRequest::from_buf(bytes.as_slice(), &arena) {
             Ok(request) => handle_request(&arena, request),
-            Err(error) => conformance_response::Result::ParseError(format!("{error:?}")),
+            Err(error) => {
+                let error_str = arena.alloc_str(&format!("{error:?}"));
+                conformance_response::Result::ParseError(error_str)
+            }
         };
 
-        let mut response_builder = protobuf::conformance::ConformanceResponseBuilder::new_in(&arena);
+        let mut response_builder =
+            protobuf::conformance::ConformanceResponseBuilder::new_in(&arena);
         response_builder.set_result(Some(result));
         let response = response_builder.freeze();
 
@@ -51,69 +55,84 @@ fn main() -> io::Result<()> {
     }
 }
 
-fn handle_request<'arena>(arena: &'arena defiant::Arena, request: ConformanceRequest<'arena>) -> conformance_response::Result<'arena> {
-    match request.requested_output_format() {
+fn handle_request<'arena>(
+    arena: &'arena defiant::Arena,
+    request: ConformanceRequest<'arena>,
+) -> conformance_response::Result<'arena> {
+    let format =
+        WireFormat::try_from(request.requested_output_format).unwrap_or(WireFormat::Unspecified);
+    match format {
         WireFormat::Unspecified => {
             return conformance_response::Result::ParseError(
-                "output format unspecified".to_string(),
+                arena.alloc_str("output format unspecified"),
             );
         }
         WireFormat::Json => {
             return conformance_response::Result::Skipped(
-                "JSON output is not supported".to_string(),
+                arena.alloc_str("JSON output is not supported"),
             );
         }
         WireFormat::Jspb => {
             return conformance_response::Result::Skipped(
-                "JSPB output is not supported".to_string(),
+                arena.alloc_str("JSPB output is not supported"),
             );
         }
         WireFormat::TextFormat => {
             return conformance_response::Result::Skipped(
-                "TEXT_FORMAT output is not supported".to_string(),
+                arena.alloc_str("TEXT_FORMAT output is not supported"),
             );
         }
         WireFormat::Protobuf => (),
     };
 
     let buf = match request.payload {
-        None => return conformance_response::Result::ParseError("no payload".to_string()),
+        None => return conformance_response::Result::ParseError(arena.alloc_str("no payload")),
         Some(conformance_request::Payload::JsonPayload(_)) => {
             return conformance_response::Result::Skipped(
-                "JSON input is not supported".to_string(),
+                arena.alloc_str("JSON input is not supported"),
             );
         }
         Some(conformance_request::Payload::JspbPayload(_)) => {
             return conformance_response::Result::Skipped(
-                "JSON input is not supported".to_string(),
+                arena.alloc_str("JSPB input is not supported"),
             );
         }
         Some(conformance_request::Payload::TextPayload(_)) => {
             return conformance_response::Result::Skipped(
-                "JSON input is not supported".to_string(),
+                arena.alloc_str("TEXT input is not supported"),
             );
         }
         Some(conformance_request::Payload::ProtobufPayload(buf)) => buf,
     };
 
-    let roundtrip = match request.message_type.as_str() {
-        "protobuf_test_messages.proto2.TestAllTypesProto2" => roundtrip::<TestAllTypesProto2>(&buf, arena),
-        "protobuf_test_messages.proto3.TestAllTypesProto3" => roundtrip::<TestAllTypesProto3>(&buf, arena),
+    let roundtrip = match request.message_type {
+        "protobuf_test_messages.proto2.TestAllTypesProto2" => {
+            roundtrip::<TestAllTypesProto2>(&buf, arena)
+        }
+        "protobuf_test_messages.proto3.TestAllTypesProto3" => {
+            roundtrip::<TestAllTypesProto3>(&buf, arena)
+        }
         _ => {
-            return conformance_response::Result::ParseError(format!(
-                "unknown message type: {}",
-                request.message_type
-            ));
+            let error = arena.alloc_str(&format!("unknown message type: {}", request.message_type));
+            return conformance_response::Result::ParseError(error);
         }
     };
 
     match roundtrip {
-        RoundtripResult::Ok(buf) => conformance_response::Result::ProtobufPayload(buf),
+        RoundtripResult::Ok(buf) => {
+            // Copy Vec<u8> into arena-allocated slice
+            let mut arena_vec = arena.new_vec_with_capacity(buf.len());
+            arena_vec.extend_from_slice(&buf);
+            let buf_slice = arena_vec.freeze();
+            conformance_response::Result::ProtobufPayload(buf_slice)
+        }
         RoundtripResult::DecodeError(error) => {
-            conformance_response::Result::ParseError(error.to_string())
+            let error_str = arena.alloc_str(&error.to_string());
+            conformance_response::Result::ParseError(error_str)
         }
         RoundtripResult::Error(error) => {
-            conformance_response::Result::RuntimeError(error.to_string())
+            let error_str = arena.alloc_str(&error.to_string());
+            conformance_response::Result::RuntimeError(error_str)
         }
     }
 }

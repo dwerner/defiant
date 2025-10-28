@@ -450,13 +450,18 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                     }
                 },
                 Field::Message(_) if field.is_repeated() => {
+                    let tag = match field {
+                        Field::Message(m) => m.tag,
+                        _ => unreachable!(),
+                    };
                     quote! {
                         {
-                            use #prost_path::Message as _;
-                            self.#field_ident.iter().map(|msg| {
-                                let len = msg.encoded_len();
-                                #prost_path::encoding::encoded_len_varint(len as u64) + len
-                            }).sum::<usize>()
+                            use #prost_path::Encode as _;
+                            #prost_path::encoding::key_len(#tag) * self.#field_ident.len()
+                                + self.#field_ident.iter().map(|msg| {
+                                    let len = msg.encoded_len();
+                                    #prost_path::encoding::encoded_len_varint(len as u64) + len
+                                }).sum::<usize>()
                         }
                     }
                 },
