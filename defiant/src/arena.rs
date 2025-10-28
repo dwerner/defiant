@@ -425,6 +425,18 @@ impl<'arena, K, V> Default for ArenaMap<'arena, K, V> {
     }
 }
 
+impl<'arena, K: PartialOrd, V: PartialOrd> PartialOrd for ArenaMap<'arena, K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.entries.partial_cmp(other.entries)
+    }
+}
+
+impl<'arena, K: Ord, V: Ord> Ord for ArenaMap<'arena, K, V> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.entries.cmp(other.entries)
+    }
+}
+
 /// Implement BufMut for ArenaVec to enable direct encoding into arena
 unsafe impl<'arena> bytes::BufMut for ArenaVec<'arena, u8> {
     #[inline]

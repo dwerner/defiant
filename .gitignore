@@ -4,3 +4,4 @@ Cargo.lock
 .DS_Store
 commit-changes.sh
 
+context-snapshot.yaml
