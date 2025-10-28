@@ -279,7 +279,8 @@ mod tests {
         // After reset, the capacity remains but the arena can be reused
         // allocated_bytes() returns the total capacity, not used bytes
         let after = arena.allocated_bytes();
-        assert!(after >= 0); // Capacity may remain allocated
+        // Capacity should still be allocated after reset
+        assert!(after > 0, "Arena capacity should remain after reset");
 
         // Verify we can allocate again after reset
         let s = arena.alloc_str("after reset");

@@ -24,7 +24,7 @@ pub struct ExternPaths {
 impl ExternPaths {
     pub fn new(
         paths: &[(String, String)],
-        prost_path: &str,
+        _prost_path: &str,
         prost_types_path: &str,
         prost_types: bool,
     ) -> Result<ExternPaths, String> {

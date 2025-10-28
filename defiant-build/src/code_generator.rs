@@ -6,8 +6,8 @@ use std::iter;
 use defiant_types::field_descriptor_proto::{Label, Type};
 use defiant_types::source_code_info::Location;
 use defiant_types::{
-    DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, EnumValueOptions,
-    FieldDescriptorProto, FieldOptions, FileDescriptorProto, OneofDescriptorProto,
+    DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto,
+    FieldDescriptorProto, FileDescriptorProto, OneofDescriptorProto,
     ServiceDescriptorProto, SourceCodeInfo,
 };
 use itertools::{Either, Itertools};
@@ -249,7 +249,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.append_message_attributes(&fq_message_name);
         self.push_indent();
         self.buf.push_str(&format!(
-            "#[derive(Clone, {}PartialEq, {}{}::Message)]\n",
+            "#[derive(Clone, {}PartialEq, {}{}::View)]\n",
             if self.context.can_message_derive_copy(&fq_message_name) {
                 "Copy, "
             } else {

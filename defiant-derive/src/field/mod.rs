@@ -251,7 +251,7 @@ impl fmt::Display for Label {
     }
 }
 
-/// Get the items belonging to the 'prost' list attribute, e.g. `#[defiant(foo, bar="baz")]`.
+/// Get the items belonging to the 'defiant' list attribute, e.g. `#[defiant(foo, bar="baz")]`.
 fn prost_attrs(attrs: Vec<Attribute>) -> Result<Vec<Meta>, Error> {
     let mut result = Vec::new();
     for attr in attrs.iter() {

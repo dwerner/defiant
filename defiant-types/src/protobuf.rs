@@ -2093,10 +2093,10 @@ pub mod value {
         BoolValue(bool),
         /// Represents a structured value.
         #[defiant(message, tag = "5")]
-        StructValue(&'arena super::Struct::<'arena>),
+        StructValue(&'arena super::Struct<'arena>),
         /// Represents a repeated `Value`.
         #[defiant(message, tag = "6")]
-        ListValue(&'arena super::ListValue::<'arena>),
+        ListValue(&'arena super::ListValue<'arena>),
     }
 }
 /// `ListValue` is a wrapper around a repeated field of values.
