@@ -1,4 +1,4 @@
-use defiant::{Encode, Message};
+use defiant::Encode;
 
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
