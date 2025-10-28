@@ -139,10 +139,12 @@ fn extract_type_path(field_type: &syn::Type) -> syn::Path {
     match field_type {
         // ::core::option::Option<T> or Option<T> → extract T
         // Handles both qualified (::core::option::Option) and unqualified (Option) forms
+        // But NOT self::Option or other::module::Option (which could be user-defined types)
         syn::Type::Path(type_path)
             if type_path.path.segments.last().unwrap().ident == "Option"
                 && (type_path.path.segments.len() == 1  // Unqualified: Option<T>
-                || type_path.path.segments.iter().any(|s| s.ident == "option" || s.ident == "core")) =>
+                || type_path.path.segments.iter().any(|s| s.ident == "option" || s.ident == "core"))
+                && !type_path.path.segments.iter().any(|s| s.ident == "self" || s.ident == "super" || s.ident == "crate") =>
         {
             // Qualified: ::core::option::Option<T>
             if let syn::PathArguments::AngleBracketed(args) =
@@ -654,9 +656,9 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             let key_merge_code = if map_field.key_ty.is_numeric() || matches!(map_field.key_ty, crate::field::scalar::Ty::Bool) {
                 // Numeric and bool types don't use arena
                 quote! {
-                    **key_opt = ::core::option::Option::Some(
-                        #prost_path::encoding::#key_mod::merge(entry_wire_type, key_opt.unwrap_or_default(), buf, ctx.clone())?
-                    );
+                    let mut key_value = key_opt.unwrap_or_default();
+                    #prost_path::encoding::#key_mod::merge(entry_wire_type, &mut key_value, buf, ctx.clone())?;
+                    **key_opt = ::core::option::Option::Some(key_value);
                     Ok(())
                 }
             } else {
@@ -971,28 +973,15 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
                 },
             }
         } else if matches!(field, Field::Oneof(_)) {
-            // Oneof field - conditionally pass arena based on whether oneof type has lifetime
+            // Oneof field - always pass arena (signature is now consistent for all oneofs)
             use crate::field::Field;
             let Field::Oneof(oneof_field) = field else { unreachable!() };
             let oneof_ty = &oneof_field.ty;
 
-            // Check if the oneof type (field_type which is Option<OneofType>) has a lifetime
-            let oneof_needs_arena = type_uses_arena(field_type);
-
-            let merge_call = if oneof_needs_arena {
-                quote! {
-                    #oneof_ty::merge(value, tag, wire_type, buf, arena, ctx)
-                }
-            } else {
-                quote! {
-                    #oneof_ty::merge(value, tag, wire_type, buf, ctx)
-                }
-            };
-
             quote! {
                 #(#tags)* => {
                     let mut value = &mut self.#field_ident;
-                    #merge_call.map_err(|mut error| {
+                    #oneof_ty::merge(value, tag, wire_type, buf, arena, ctx).map_err(|mut error| {
                         error.push(STRUCT_NAME, stringify!(#field_ident));
                         error
                     })
@@ -1128,16 +1117,70 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
-        // Tuple structs not yet implemented
-        quote!()
+        // Tuple structs - generate tuple-style fields
+        let field_types = fields_with_types.iter().map(|(_field_ident, field_type, field)| {
+            use crate::field::Field;
+
+            // Same type logic as named structs
+            let message_field_type = if matches!(field, Field::Map(_)) {
+                let extracted_type = if let syn::Type::Path(type_path) = field_type {
+                    if let Some(last_seg) = type_path.path.segments.last() {
+                        if last_seg.ident == "ArenaMap" {
+                            if let syn::PathArguments::AngleBracketed(args) = &last_seg.arguments {
+                                let type_args: Vec<_> = args.args.iter().skip(1).collect();
+                                if type_args.len() == 2 {
+                                    let key_ty = &type_args[0];
+                                    let val_ty = &type_args[1];
+                                    Some(quote!(#prost_path::arena::ArenaVec<'arena, (#key_ty, #val_ty)>))
+                                } else {
+                                    None
+                                }
+                            } else {
+                                None
+                            }
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                extracted_type.unwrap_or_else(|| quote!(#field_type))
+            } else if field.is_repeated() {
+                slice_to_bumpvec(field_type, &prost_path)
+            } else {
+                quote!(#field_type)
+            };
+            quote!(pub(crate) #message_field_type)
+        });
+
+        if needs_arena {
+            quote! {
+                (pub(crate) &'arena #prost_path::Arena, #(#field_types),*)
+            }
+        } else {
+            quote! {
+                (#(#field_types),*)
+            }
+        }
     };
 
     // Generate *Message struct definition (Builder)
     // Even scalar-only messages need Builders because they can be referenced in other messages
-    let message_struct = quote! {
-        #[allow(dead_code)]
-        pub struct #message_ident #ty_generics {
-            #message_fields
+    let message_struct = if is_struct {
+        quote! {
+            #[allow(dead_code, missing_docs)]
+            pub struct #message_ident #ty_generics {
+                #message_fields
+            }
+        }
+    } else {
+        // Tuple struct - use parentheses and semicolon
+        quote! {
+            #[allow(dead_code, missing_docs)]
+            pub struct #message_ident #ty_generics #message_fields;
         }
     };
 
@@ -1488,6 +1531,8 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
 
         if needs_arena {
             quote! {
+                #[allow(missing_docs)]
+                #[allow(missing_docs)]
                 impl #impl_generics #message_ident #ty_generics #where_clause {
                     pub fn new_in(arena: &'arena #prost_path::Arena) -> Self {
                         Self {
@@ -1518,6 +1563,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         } else {
             // Scalar-only Builders don't have arena field, but still need methods
             quote! {
+                #[allow(missing_docs)]
                 impl #impl_generics #message_ident #ty_generics #where_clause {
                     pub fn new() -> Self {
                         Self {
@@ -1552,7 +1598,105 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
-        quote!()
+        // Tuple structs
+        let field_inits = fields_with_types.iter().map(|(_field_ident, field_type, field)| {
+            use crate::field::{Field, Label};
+            if field.is_repeated() {
+                quote!(arena.new_vec())
+            } else {
+                match field {
+                    Field::Message(_) | Field::Group(_) => {
+                        let label = match field {
+                            Field::Message(mf) => mf.label,
+                            Field::Group(gf) => gf.label,
+                            _ => unreachable!(),
+                        };
+                        match label {
+                            Label::Optional => quote!(::core::option::Option::None),
+                            Label::Required => {
+                                let base_path = extract_type_path(field_type);
+                                let mut builder_path = base_path.clone();
+                                if let Some(last_seg) = builder_path.segments.last_mut() {
+                                    let type_name = last_seg.ident.to_string();
+                                    last_seg.ident = Ident::new(&format!("{}Builder", type_name), Span::call_site());
+                                }
+                                let field_needs_arena = type_uses_arena(field_type);
+                                if field_needs_arena {
+                                    quote!(&*arena.alloc(#builder_path::new_in(arena).freeze()))
+                                } else {
+                                    quote!(#builder_path::new().freeze())
+                                }
+                            },
+                            Label::Repeated => unreachable!("Repeated handled above"),
+                        }
+                    },
+                    _ => {
+                        let default_value = field.default(&prost_path);
+                        quote!(#default_value)
+                    }
+                }
+            }
+        });
+
+        let freeze_field_inits: Vec<_> = fields_with_types.iter().map(|(field_ident, _field_type, field)| {
+            use crate::field::Field;
+            if matches!(field, Field::Map(_)) {
+                quote!(self.#field_ident.freeze())
+            } else if field.is_repeated() {
+                quote!(self.#field_ident.freeze())
+            } else {
+                quote!(self.#field_ident)
+            }
+        }).collect();
+
+        if needs_arena {
+            quote! {
+                #[allow(missing_docs)]
+                impl #impl_generics #message_ident #ty_generics #where_clause {
+                    pub fn new_in(arena: &'arena #prost_path::Arena) -> Self {
+                        Self(arena, #(#field_inits),*)
+                    }
+
+                    pub fn freeze(self) -> #ident #ty_generics {
+                        #ident(#(#freeze_field_inits),*)
+                    }
+
+                    pub fn decode(buf: impl #prost_path::bytes::Buf, arena: &'arena #prost_path::Arena)
+                        -> ::core::result::Result<Self, #prost_path::DecodeError>
+                    {
+                        let mut message = Self::new_in(arena);
+                        message.merge(buf, arena)?;
+                        Ok(message)
+                    }
+                }
+            }
+        } else {
+            quote! {
+                #[allow(missing_docs)]
+                impl #impl_generics #message_ident #ty_generics #where_clause {
+                    pub fn new() -> Self {
+                        Self(#(#field_inits),*)
+                    }
+
+                    #[allow(unused_variables)]
+                    pub fn new_in(arena: &#prost_path::Arena) -> Self {
+                        Self::new()
+                    }
+
+                    pub fn freeze(self) -> #ident #ty_generics {
+                        #ident(#(#freeze_field_inits),*)
+                    }
+
+                    pub fn decode(buf: impl #prost_path::bytes::Buf, arena: &#prost_path::Arena)
+                        -> ::core::result::Result<Self, #prost_path::DecodeError>
+                    {
+                        let mut message = Self::new_in(arena);
+                        message.merge(buf, arena)?;
+                        Ok(message)
+                    }
+                }
+            }
+        }
     };
 
     // Generate internal methods for Builder (decode/encode infrastructure)
@@ -1567,6 +1711,7 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
         };
 
         quote! {
+            #[allow(missing_docs)]
             impl #impl_generics #message_ident #ty_generics #where_clause {
                 #[allow(unused_variables)]
                 pub fn merge_field(
@@ -1597,7 +1742,44 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
-        quote!()
+        // Tuple structs use the same merge logic (tag-based, not name-based)
+        let arena_binding = if needs_arena {
+            quote!(let arena = self.arena;)
+        } else {
+            quote!()
+        };
+
+        quote! {
+            #[allow(missing_docs)]
+            impl #impl_generics #message_ident #ty_generics #where_clause {
+                #[allow(unused_variables)]
+                pub fn merge_field(
+                    &mut self,
+                    tag: u32,
+                    wire_type: #prost_path::encoding::wire_type::WireType,
+                    buf: &mut impl #prost_path::bytes::Buf,
+                    arena: &#prost_path::Arena,
+                    ctx: #prost_path::encoding::DecodeContext,
+                ) -> ::core::result::Result<(), #prost_path::DecodeError>
+                {
+                    #arena_binding
+                    #struct_name
+                    match tag {
+                        #(#merge)*
+                        _ => #prost_path::encoding::skip_field(wire_type, tag, buf, ctx),
+                    }
+                }
+
+                pub fn merge(&mut self, mut buf: impl #prost_path::bytes::Buf, arena: &#prost_path::Arena) -> ::core::result::Result<(), #prost_path::DecodeError> {
+                    let ctx = #prost_path::encoding::DecodeContext::default();
+                    while buf.has_remaining() {
+                        let (tag, wire_type) = #prost_path::encoding::decode_key(&mut buf)?;
+                        self.merge_field(tag, wire_type, &mut buf, arena, ctx.clone())?;
+                    }
+                    Ok(())
+                }
+            }
+        }
     };
 
     // Generate Encode impl for View types (arena-allocated messages)
@@ -2131,7 +2313,146 @@ fn try_message(input: TokenStream) -> Result<TokenStream, Error> {
             }
         }
     } else {
-        quote!()
+        // Tuple structs - copy implementation is similar but accesses fields by index
+        let copy_calls: Vec<_> = fields_with_types.iter().map(|(field_ident, field_type, field)| {
+            use crate::field::{Field, Label};
+
+            match field {
+                Field::Map(map_field) => {
+                    use crate::field::ValueTy;
+                    match &map_field.value_ty {
+                        ValueTy::Message => {
+                            let value_is_ref = if let syn::Type::Path(type_path) = field_type {
+                                if let Some(last_seg) = type_path.path.segments.last() {
+                                    if last_seg.ident == "ArenaMap" {
+                                        if let syn::PathArguments::AngleBracketed(args) = &last_seg.arguments {
+                                            let type_args: Vec<_> = args.args.iter().skip(1).collect();
+                                            if type_args.len() == 2 {
+                                                if let syn::GenericArgument::Type(val_ty) = type_args[1] {
+                                                    matches!(val_ty, syn::Type::Reference(_))
+                                                } else {
+                                                    false
+                                                }
+                                            } else {
+                                                false
+                                            }
+                                        } else {
+                                            false
+                                        }
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            } else {
+                                false
+                            };
+
+                            if value_is_ref {
+                                quote! {
+                                    for (k, v) in self.#field_ident.iter() {
+                                        let v_builder = v.copy_to_builder(arena);
+                                        let v_frozen = v_builder.freeze();
+                                        let v_ref = &*arena.alloc(v_frozen);
+                                        builder.#field_ident.push((*k, v_ref));
+                                    }
+                                }
+                            } else {
+                                quote! {
+                                    for (k, v) in self.#field_ident.iter() {
+                                        let v_builder = v.copy_to_builder(arena);
+                                        let v_frozen = v_builder.freeze();
+                                        builder.#field_ident.push((*k, v_frozen));
+                                    }
+                                }
+                            }
+                        }
+                        _ => {
+                            quote! {
+                                for (k, v) in self.#field_ident.iter() {
+                                    builder.#field_ident.push((*k, *v));
+                                }
+                            }
+                        }
+                    }
+                }
+                Field::Message(_) | Field::Group(_) => {
+                    let label = match field {
+                        Field::Message(mf) => mf.label,
+                        Field::Group(gf) => gf.label,
+                        _ => unreachable!(),
+                    };
+                    match label {
+                        Label::Optional => {
+                            quote! {
+                                builder.#field_ident = self.#field_ident.map(|msg| {
+                                    let msg_builder = msg.copy_to_builder(arena);
+                                    let msg_frozen = msg_builder.freeze();
+                                    &*arena.alloc(msg_frozen)
+                                });
+                            }
+                        }
+                        Label::Required => {
+                            quote! {
+                                builder.#field_ident = {
+                                    let msg_builder = self.#field_ident.copy_to_builder(arena);
+                                    let msg_frozen = msg_builder.freeze();
+                                    &*arena.alloc(msg_frozen)
+                                };
+                            }
+                        }
+                        Label::Repeated => {
+                            quote! {
+                                for msg in self.#field_ident {
+                                    let msg_builder = msg.copy_to_builder(arena);
+                                    let msg_frozen = msg_builder.freeze();
+                                    let msg_ref = &*arena.alloc(msg_frozen);
+                                    builder.#field_ident.push(msg_ref);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    if field.is_repeated() {
+                        quote! {
+                            for item in self.#field_ident {
+                                builder.#field_ident.push(*item);
+                            }
+                        }
+                    } else {
+                        quote! {
+                            builder.#field_ident = self.#field_ident;
+                        }
+                    }
+                }
+            }
+        }).collect();
+
+        if needs_arena {
+            quote! {
+                impl #ident {
+                    /// Creates a new builder by copying data from this view.
+                    pub fn copy_to_builder<'arena>(&self, arena: &'arena #prost_path::Arena) -> #message_ident<'arena> {
+                        let mut builder = #message_ident::new_in(arena);
+                        #(#copy_calls)*
+                        builder
+                    }
+                }
+            }
+        } else {
+            quote! {
+                impl #ident {
+                    /// Creates a new builder by copying data from this view.
+                    pub fn copy_to_builder<'arena>(&self, arena: &'arena #prost_path::Arena) -> #message_ident {
+                        let mut builder = #message_ident::new_in(arena);
+                        #(#copy_calls)*
+                        builder
+                    }
+                }
+            }
+        }
     };
 
     let expanded = quote! {
@@ -2603,9 +2924,11 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             quote!(#deprecated #ident::#variant_ident(value) => #encoded_len)
         });
 
-    // Generate merge function signature with optional arena parameter
+    // Generate merge function signature - always include arena parameter for consistency
+    // with Builder merge_field signature, even if scalar-only oneofs don't use it
     let merge_signature = if needs_arena {
         quote! {
+            #[allow(unused_variables)]
             pub fn merge(
                 field: &mut ::core::option::Option<#ident #ty_generics>,
                 tag: u32,
@@ -2616,12 +2939,15 @@ fn try_oneof(input: TokenStream) -> Result<TokenStream, Error> {
             ) -> ::core::result::Result<(), #prost_path::DecodeError>
         }
     } else {
+        // Scalar-only oneofs don't have a lifetime parameter, so arena doesn't need one either
         quote! {
+            #[allow(unused_variables)]
             pub fn merge(
                 field: &mut ::core::option::Option<#ident #ty_generics>,
                 tag: u32,
                 wire_type: #prost_path::encoding::wire_type::WireType,
                 buf: &mut impl #prost_path::bytes::Buf,
+                arena: &#prost_path::Arena,
                 ctx: #prost_path::encoding::DecodeContext,
             ) -> ::core::result::Result<(), #prost_path::DecodeError>
         }

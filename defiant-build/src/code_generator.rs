@@ -1168,11 +1168,19 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             ident_path.next();
         }
 
-        local_path
+        let result = local_path
             .map(|_| "super".to_string())
             .chain(ident_path.map(to_snake))
             .chain(iter::once(to_upper_camel(ident_type)))
-            .join("::")
+            .join("::");
+
+        // If the resolved name conflicts with Rust std types, prefix with self:: to disambiguate
+        // This handles protobuf types named "Option", "Result", etc.
+        if !result.contains("::") && matches!(result.as_str(), "Option" | "Result") {
+            format!("self::{}", result)
+        } else {
+            result
+        }
     }
 
     fn field_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {
