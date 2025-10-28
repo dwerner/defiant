@@ -1,7 +1,6 @@
+// Ident conversion tests - using View API
 use crate::roundtrip;
-use alloc::collections::BTreeMap;
-use alloc::vec::Vec;
-use defiant::Message;
+use defiant::{Arena, Encode};
 
 pub mod bar_baz {
     include!(concat!(env!("OUT_DIR"), "/ident_conversion.bar_baz.rs"));
@@ -9,12 +8,21 @@ pub mod bar_baz {
 
 #[test]
 fn test_ident_conversions() {
+    let arena = Arena::new();
+
+    // Create a FuzzBuster in the arena
+    let fuzz_buster = bar_baz::foo_bar_baz::FuzzBuster {
+        t: &[], // Empty map for now (maps are arena slices)
+        nested_self: None,
+    };
+    let fuzz_buster_ref = arena.alloc(fuzz_buster);
+
+    // Allocate the slice in the arena
+    let fuzz_busters_slice = arena.alloc([fuzz_buster_ref]);
+
     let msg = bar_baz::FooBarBaz {
         foo_bar_baz: 42,
-        fuzz_busters: Vec::from([bar_baz::foo_bar_baz::FuzzBuster {
-            t: BTreeMap::<i32, bar_baz::FooBarBaz>::new(),
-            nested_self: None,
-        }]),
+        fuzz_busters: fuzz_busters_slice,
         p_i_e: 0,
         r#as: 4,
         r#break: 5,
@@ -78,7 +86,7 @@ fn test_ident_conversions() {
     let _ = bar_baz::foo_bar_baz::StrawberryRhubarbPie::FuzzBuster;
     let _ = bar_baz::foo_bar_baz::StrawberryRhubarbPie::NormalRustEnumCase;
 
-    let mut buf = Vec::new();
-    msg.encode(&mut buf).expect("encode");
-    roundtrip::<bar_baz::FooBarBaz>(&buf).unwrap();
+    let mut buf = alloc::vec::Vec::new();
+    msg.encode(&mut buf);
+    roundtrip::<bar_baz::FooBarBaz>(&buf, &arena).unwrap();
 }

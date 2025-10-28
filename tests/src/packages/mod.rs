@@ -1,5 +1,7 @@
 //! Tests nested packages.
 
+use defiant::Encode;
+
 include!(concat!(env!("OUT_DIR"), "/packages.rs"));
 
 pub mod gizmo {
@@ -24,29 +26,65 @@ impl DoIt for gizmo::Gizmo {
 
 #[test]
 fn test() {
-    use defiant::Message;
+    let arena = defiant::Arena::new();
 
-    let mut widget_factory = widget::factory::WidgetFactory::default();
+    let builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    let widget_factory = builder.freeze();
     assert_eq!(0, widget_factory.encoded_len());
 
-    widget_factory.inner = Some(widget::factory::widget_factory::Inner {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    let widget_factory = builder.freeze();
     assert_eq!(2, widget_factory.encoded_len());
 
-    widget_factory.root = Some(Root {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    builder.set_root(Some(Root {}));
+    let widget_factory = builder.freeze();
     assert_eq!(4, widget_factory.encoded_len());
 
-    widget_factory.root_inner = Some(root::Inner {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    builder.set_root(Some(Root {}));
+    builder.set_root_inner(Some(root::Inner {}));
+    let widget_factory = builder.freeze();
     assert_eq!(6, widget_factory.encoded_len());
 
-    widget_factory.widget = Some(widget::Widget {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    builder.set_root(Some(Root {}));
+    builder.set_root_inner(Some(root::Inner {}));
+    builder.set_widget(Some(widget::Widget {}));
+    let widget_factory = builder.freeze();
     assert_eq!(8, widget_factory.encoded_len());
 
-    widget_factory.widget_inner = Some(widget::widget::Inner {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    builder.set_root(Some(Root {}));
+    builder.set_root_inner(Some(root::Inner {}));
+    builder.set_widget(Some(widget::Widget {}));
+    builder.set_widget_inner(Some(widget::widget::Inner {}));
+    let widget_factory = builder.freeze();
     assert_eq!(10, widget_factory.encoded_len());
 
-    widget_factory.gizmo = Some(gizmo::Gizmo {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    builder.set_root(Some(Root {}));
+    builder.set_root_inner(Some(root::Inner {}));
+    builder.set_widget(Some(widget::Widget {}));
+    builder.set_widget_inner(Some(widget::widget::Inner {}));
+    builder.set_gizmo(Some(gizmo::Gizmo {}));
+    let widget_factory = builder.freeze();
     assert_eq!(12, widget_factory.encoded_len());
 
-    widget_factory.gizmo_inner = Some(gizmo::gizmo::Inner {});
+    let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
+    builder.set_inner(Some(widget::factory::widget_factory::Inner {}));
+    builder.set_root(Some(Root {}));
+    builder.set_root_inner(Some(root::Inner {}));
+    builder.set_widget(Some(widget::Widget {}));
+    builder.set_widget_inner(Some(widget::widget::Inner {}));
+    builder.set_gizmo(Some(gizmo::Gizmo {}));
+    builder.set_gizmo_inner(Some(gizmo::gizmo::Inner {}));
+    let widget_factory = builder.freeze();
     assert_eq!(14, widget_factory.encoded_len());
 }

@@ -1,13 +1,13 @@
 //! Simple test without repeated fields
 
-use defiant_derive::Message;
+use defiant_derive::View;
 
-#[derive(Message)]
+#[derive(View)]
 struct SimplePerson<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(int32, tag = "2")]
+    #[defiant(int32, tag = "2")]
     age: i32,
 }
 
@@ -17,7 +17,7 @@ fn test_simple() {
 
     let arena = Arena::new();
 
-    let mut msg = SimplePersonMessage::new_in(&arena);
+    let mut msg = SimplePersonBuilder::new_in(&arena);
     msg.set_name("Alice");
     msg.set_age(30);
 

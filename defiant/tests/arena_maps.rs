@@ -1,9 +1,10 @@
 //! Test for arena-allocated map fields
 
-use defiant::{Arena, ArenaMap, Encode, Message};
+use defiant_derive::View;
+use defiant::{Arena, ArenaMap, Encode};
 
 /// UserProfile with map fields
-#[derive(Message)]
+#[derive(View)]
 struct UserProfile<'arena> {
     #[defiant(string, tag = 1)]
     username: &'arena str,

@@ -1,8 +1,9 @@
 //! Test map field with string values
 
+use defiant_derive::View;
 use defiant::{Arena, ArenaMap, Encode};
 
-#[derive(defiant_derive::Message)]
+#[derive(defiant_derive::View)]
 struct MapTest<'arena> {
     #[defiant(btree_map = "string, string", tag = "1")]
     map_field: ArenaMap<'arena, &'arena str, &'arena str>,

@@ -19,10 +19,12 @@
 //! }
 //! ```
 
-use defiant::{Arena, Decode, Encode, Message, Oneof};
+use defiant_derive::View;
+use defiant::{Arena, Decode, Encode, Oneof};
 
 /// Image message
-#[derive(Clone, PartialEq, Message)]
+#[derive(Clone, PartialEq, Debug, View)]
+#[defiant(skip_debug)]
 struct Image<'arena> {
     #[defiant(string, tag = 1)]
     url: &'arena str,
@@ -33,7 +35,7 @@ struct Image<'arena> {
 }
 
 /// Notification with oneof field
-#[derive(Message)]
+#[derive(View)]
 struct Notification<'arena> {
     #[defiant(oneof = "Payload", tags = "1, 2, 3")]
     payload: Option<Payload<'arena>>,

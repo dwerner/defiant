@@ -1,11 +1,12 @@
 //! Test for derive macro with arena allocation
 //!
-//! This test verifies that the #[derive(Message)] macro generates correct arena-aware code.
+//! This test verifies that the #[derive(View)] macro generates correct arena-aware code.
 
-use defiant::{Arena, Encode, Message};
+use defiant_derive::View;
+use defiant::{Arena, Encode};
 
 /// A simple Person message using the derive macro
-#[derive(Message)]
+#[derive(View)]
 struct PersonDerived<'arena> {
     #[defiant(string, tag = 1)]
     name: &'arena str,

@@ -37,7 +37,8 @@ fn bootstrap() {
         .tempdir()
         .unwrap();
 
-    defiant_build::Config::new()
+    let arena = defiant::Arena::new();
+    defiant_build::Config::new(&arena)
         .compile_well_known_types()
         .btree_map(["."])
         .type_attribute(

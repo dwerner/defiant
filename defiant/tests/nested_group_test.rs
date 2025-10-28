@@ -1,14 +1,15 @@
-use defiant::{Arena, Message};
+use defiant_derive::View;
+use defiant::Arena;
 
-#[derive(Clone, PartialEq, Message)]
+#[derive(Clone, PartialEq, View)]
 pub struct Outer<'arena> {
-    #[prost(group, repeated, tag = "1")]
+    #[defiant(group, repeated, tag = "1")]
     pub inner_group: &'arena [InnerGroup<'arena>],
 }
 
-#[derive(Clone, PartialEq, Message)]
+#[derive(Clone, PartialEq, View)]
 pub struct InnerGroup<'arena> {
-    #[prost(string, required, tag = "2")]
+    #[defiant(string, required, tag = "2")]
     pub name: &'arena str,
 }
 
