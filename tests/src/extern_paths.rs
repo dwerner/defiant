@@ -69,7 +69,7 @@ fn test() {
     builder.set_gizmo(Some(gizmo::Gizmo {}));
     let widget_factory = builder.freeze();
     assert_eq!(12, widget_factory.encoded_len());
-    widget_factory.gizmo().map(DoIt::do_it);
+    widget_factory.gizmo.as_ref().map(DoIt::do_it);
 
     let mut builder = widget::factory::WidgetFactoryBuilder::new_in(&arena);
     builder.set_inner(Some(widget::factory::widget_factory::Inner {}));

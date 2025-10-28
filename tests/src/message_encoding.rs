@@ -6,7 +6,7 @@ use defiant::alloc::vec;
 use defiant::alloc::{borrow::ToOwned, string::String, vec::Vec};
 
 use defiant::bytes::Bytes;
-use defiant::{Enumeration, Oneof};
+use defiant::{Encode, Enumeration, Oneof};
 
 use crate::check_message;
 use crate::check_serialize_equivalent;
@@ -22,15 +22,14 @@ pub struct RepeatedFloats<'arena> {
 #[test]
 fn check_repeated_floats() {
     let arena = defiant::Arena::new();
-    let msg = RepeatedFloats::builder(&arena)
-        .set_single_float(0.0)
-        .repeated_float
-        .extend(&[
-            0.1,
-            340282300000000000000000000000000000000.0,
-            0.000000000000000000000000000000000000011754944,
-        ])
-        .freeze();
+    let mut builder = RepeatedFloats::builder(&arena);
+    builder.set_single_float(0.0);
+    builder.repeated_float.extend([
+        0.1,
+        340282300000000000000000000000000000000.0,
+        0.000000000000000000000000000000000000011754944,
+    ]);
+    let msg = builder.freeze();
     check_message(&msg, &arena);
 }
 
@@ -302,12 +301,12 @@ fn check_default_values() {
     let default = DefaultValues::arena_default(&arena).freeze();
     assert_eq!(default.int32, 42);
     assert_eq!(default.optional_int32, None);
-    assert_eq!(&default.string, "forty two");
-    assert_eq!(&default.bytes_vec, b"foo\0bar");
-    assert_eq!(&default.bytes_buf, b"foo\0bar");
+    assert_eq!(default.string, "forty two");
+    assert_eq!(default.bytes_vec, b"foo\0bar");
+    assert_eq!(default.bytes_buf, b"foo\0bar");
     assert_eq!(default.enumeration, BasicEnumeration::ONE as i32);
     assert_eq!(default.optional_enumeration, None);
-    assert_eq!(&default.repeated_enumeration, &[]);
+    assert_eq!(default.repeated_enumeration, &[]);
     assert_eq!(0, default.encoded_len());
 }
 

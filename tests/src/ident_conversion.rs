@@ -12,13 +12,13 @@ fn test_ident_conversions() {
 
     // Create a FuzzBuster in the arena
     let fuzz_buster = bar_baz::foo_bar_baz::FuzzBuster {
-        t: &[], // Empty map for now (maps are arena slices)
+        t: defiant::ArenaMap::new(&[]), // Empty map
         nested_self: None,
     };
-    let fuzz_buster_ref = arena.alloc(fuzz_buster);
+    let fuzz_buster_ref: &bar_baz::foo_bar_baz::FuzzBuster = arena.alloc(fuzz_buster);
 
-    // Allocate the slice in the arena
-    let fuzz_busters_slice = arena.alloc([fuzz_buster_ref]);
+    // Allocate the slice in the arena - elements must be immutable references
+    let fuzz_busters_slice: &[&bar_baz::foo_bar_baz::FuzzBuster] = arena.alloc([fuzz_buster_ref as &_]);
 
     let msg = bar_baz::FooBarBaz {
         foo_bar_baz: 42,
