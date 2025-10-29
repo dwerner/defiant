@@ -279,7 +279,8 @@ mod tests {
         // After reset, the capacity remains but the arena can be reused
         // allocated_bytes() returns the total capacity, not used bytes
         let after = arena.allocated_bytes();
-        assert!(after >= 0); // Capacity may remain allocated
+        // Capacity should still be allocated after reset
+        assert!(after > 0, "Arena capacity should remain after reset");
 
         // Verify we can allocate again after reset
         let s = arena.alloc_str("after reset");
@@ -421,6 +422,18 @@ impl<'arena, K: core::fmt::Debug, V: core::fmt::Debug> core::fmt::Debug for Aren
 impl<'arena, K, V> Default for ArenaMap<'arena, K, V> {
     fn default() -> Self {
         ArenaMap { entries: &[] }
+    }
+}
+
+impl<'arena, K: PartialOrd, V: PartialOrd> PartialOrd for ArenaMap<'arena, K, V> {
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        self.entries.partial_cmp(other.entries)
+    }
+}
+
+impl<'arena, K: Ord, V: Ord> Ord for ArenaMap<'arena, K, V> {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.entries.cmp(other.entries)
     }
 }
 

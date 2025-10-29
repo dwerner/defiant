@@ -1,9 +1,10 @@
 //! Test for arena-allocated Person message
 
-use defiant::{Arena, Encode, Message};
+use defiant::{Arena, Encode};
+use defiant_derive::View;
 
 /// A simple Person message with arena-allocated fields.
-#[derive(Message)]
+#[derive(View)]
 struct Person<'arena> {
     #[defiant(string, tag = 1)]
     name: &'arena str,

@@ -1,17 +1,17 @@
 //! Demonstration of the arena-based Message API
 
-use defiant::{Arena, MessageView};
-use defiant_derive::Message;
+use defiant::{Arena, Encode, MessageView};
+use defiant_derive::View;
 
-#[derive(Message)]
+#[derive(View)]
 struct Person<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(int32, tag = "2")]
+    #[defiant(int32, tag = "2")]
     age: i32,
 
-    #[prost(string, repeated, tag = "3")]
+    #[defiant(string, repeated, tag = "3")]
     emails: &'arena [&'arena str],
 }
 
@@ -50,7 +50,7 @@ fn demo_encode_decode() {
     let arena1 = Arena::new();
 
     // Build a message
-    let mut builder = PersonMessage::new_in(&arena1);
+    let mut builder = PersonBuilder::new_in(&arena1);
     builder.set_name("Bob");
     builder.set_age(25);
     builder.push_emails("bob@example.com");
@@ -63,9 +63,9 @@ fn demo_encode_decode() {
 
     // Decode into new arena
     let arena2 = Arena::new();
-    let decoded = PersonMessage::decode(&buf[..], &arena2).unwrap();
+    let decoded = PersonBuilder::decode(&buf[..], &arena2).unwrap();
 
     assert_eq!(decoded.name, "Bob");
     assert_eq!(decoded.age, 25);
-    assert_eq!(decoded.emails, &["bob@example.com"]);
+    assert_eq!(&decoded.emails[..], &["bob@example.com"]);
 }

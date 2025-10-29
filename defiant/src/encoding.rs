@@ -266,8 +266,8 @@ macro_rules! varint {
 
             pub fn merge(wire_type: WireType, value: &mut $ty, buf: &mut impl Buf, _ctx: DecodeContext) -> Result<(), DecodeError> {
                 check_wire_type(WireType::Varint, wire_type)?;
-                let $from_uint64_value = decode_varint(buf)?;
-                *value = $from_uint64;
+                let __decoded_varint_wire_value = decode_varint(buf)?;
+                *value = (|$from_uint64_value| $from_uint64)(__decoded_varint_wire_value);
                 Ok(())
             }
 
@@ -356,7 +356,7 @@ varint!(u32, uint32);
 varint!(u64, uint64);
 varint!(i32, sint32,
 to_uint64(value) {
-    ((value << 1) ^ (value >> 31)) as u32 as u64
+    ((*value << 1) ^ (*value >> 31)) as u32 as u64
 },
 from_uint64(value) {
     let value = value as u32;
@@ -364,7 +364,7 @@ from_uint64(value) {
 });
 varint!(i64, sint64,
 to_uint64(value) {
-    ((value << 1) ^ (value >> 63)) as u64
+    ((*value << 1) ^ (*value >> 63)) as u64
 },
 from_uint64(value) {
     ((value >> 1) as i64) ^ (-((value & 1) as i64))

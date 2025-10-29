@@ -118,13 +118,25 @@ fn install_protoc_and_conformance_test_runner(
     if build_conformance {
         // Install the conformance-test-runner binary, since it isn't done automatically.
         // The cmake build directory is where the binary is built before installation
-        fs::copy(
+        // Note: The binary location can be either build/conformance_test_runner or build/bin/conformance_test_runner
+        let conformance_src = cmake_build_dir
+            .join("build")
+            .join("bin")
+            .join("conformance_test_runner");
+
+        let conformance_src = if conformance_src.exists() {
+            conformance_src
+        } else {
             cmake_build_dir
                 .join("build")
-                .join("conformance_test_runner"),
+                .join("conformance_test_runner")
+        };
+
+        fs::copy(
+            &conformance_src,
             prefix_dir.join("bin").join("conformance-test-runner"),
         )
-        .context("failed to copy conformance-test-runner")?;
+        .with_context(|| format!("failed to copy conformance-test-runner from {}", conformance_src.display()))?;
     }
 
     Ok(())

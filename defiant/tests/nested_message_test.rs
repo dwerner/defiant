@@ -1,36 +1,36 @@
 //! Test nested message support
 
 use defiant::Arena;
-use defiant_derive::Message;
+use defiant_derive::View;
 
-#[derive(Message)]
+#[derive(Clone, View)]
 struct Address<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     street: &'arena str,
 
-    #[prost(string, tag = "2")]
+    #[defiant(string, tag = "2")]
     city: &'arena str,
 
-    #[prost(int32, tag = "3")]
+    #[defiant(int32, tag = "3")]
     zip: i32,
 }
 
 // Test simple message without nested messages first
-#[derive(Message)]
+#[derive(View)]
 struct SimplePerson<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(int32, tag = "2")]
+    #[defiant(int32, tag = "2")]
     age: i32,
 }
 
-#[derive(Message)]
+#[derive(View)]
 struct Person<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(message, tag = "2")]
+    #[defiant(message, tag = "2")]
     address: Option<&'arena Address<'arena>>,
 }
 
@@ -39,28 +39,28 @@ fn test_optional_message() {
     let arena = Arena::new();
 
     // Create nested message
-    let mut addr = AddressMessage::new_in(&arena);
+    let mut addr = AddressBuilder::new_in(&arena);
     addr.set_street("123 Main St");
     addr.set_city("Springfield");
     addr.set_zip(12345);
     let address_view = addr.freeze();
 
     // Create parent with nested message
-    let mut person = PersonMessage::new_in(&arena);
+    let mut person = PersonBuilder::new_in(&arena);
     person.set_name("Alice");
-    person.set_address(Some(address_view));
+    person.set_address(Some(&address_view));
 
     assert_eq!(person.name(), "Alice");
     assert!(person.address().is_some());
     assert_eq!(person.address().unwrap().street, "123 Main St");
 }
 
-#[derive(Message)]
+#[derive(View)]
 struct PersonWithRepeated<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(message, repeated, tag = "2")]
+    #[defiant(message, repeated, tag = "2")]
     previous_addresses: &'arena [Address<'arena>],
 }
 
@@ -68,17 +68,17 @@ struct PersonWithRepeated<'arena> {
 fn test_repeated_messages() {
     let arena = Arena::new();
 
-    let mut addr1 = AddressMessage::new_in(&arena);
+    let mut addr1 = AddressBuilder::new_in(&arena);
     addr1.set_street("Old Street");
     addr1.set_city("OldCity");
     addr1.set_zip(11111);
 
-    let mut addr2 = AddressMessage::new_in(&arena);
+    let mut addr2 = AddressBuilder::new_in(&arena);
     addr2.set_street("Older Street");
     addr2.set_city("OlderCity");
     addr2.set_zip(22222);
 
-    let mut person = PersonWithRepeatedMessage::new_in(&arena);
+    let mut person = PersonWithRepeatedBuilder::new_in(&arena);
     person.set_name("Bob");
     person.push_previous_addresses(addr1.freeze());
     person.push_previous_addresses(addr2.freeze());

@@ -9,9 +9,9 @@ pub mod container {
     #[derive(Clone, PartialEq, Eq, Hash, ::defiant::Oneof)]
     pub enum Data<'arena> {
         #[defiant(message, tag = "1")]
-        Foo(&'arena super::Foo::<'arena>),
+        Foo(&'arena super::Foo<'arena>),
         #[defiant(message, tag = "2")]
-        Bar(&'arena super::Bar::<'arena>),
+        Bar(super::Bar),
     }
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::defiant::View)]
@@ -20,9 +20,9 @@ pub struct Foo<'arena> {
     pub foo: &'arena str,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::defiant::View)]
-pub struct Bar<'arena> {
+pub struct Bar {
     #[defiant(message, optional, tag = "1")]
-    pub qux: ::core::option::Option<&'arena Qux>,
+    pub qux: ::core::option::Option<Qux>,
 }
 #[derive(Clone, Copy, PartialEq, Eq, Hash, ::defiant::View)]
 pub struct Qux {

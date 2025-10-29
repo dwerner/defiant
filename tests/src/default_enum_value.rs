@@ -8,7 +8,12 @@ include!(concat!(env!("OUT_DIR"), "/default_enum_value.rs"));
 
 #[test]
 fn test_default_enum() {
-    let msg = Test::default();
+    // For Copy types without arena lifetimes, use struct initialization
+    let msg = Test {
+        privacy_level_1: None,
+        privacy_level_3: None,
+        privacy_level_4: None,
+    };
     assert_eq!(msg.privacy_level_1(), PrivacyLevel::One);
     assert_eq!(msg.privacy_level_3(), PrivacyLevel::PrivacyLevelThree);
     assert_eq!(
@@ -16,7 +21,9 @@ fn test_default_enum() {
         PrivacyLevel::PrivacyLevelprivacyLevelFour
     );
 
-    let msg = CMsgRemoteClientBroadcastHeader::default();
+    let msg = CMsgRemoteClientBroadcastHeader {
+        msg_type: None,
+    };
     assert_eq!(
         msg.msg_type(),
         ERemoteClientBroadcastMsg::KERemoteClientBroadcastMsgDiscovery
@@ -82,7 +89,7 @@ fn test_enum_try_from_i32() {
         Ok(PrivacyLevel::PrivacyLevelprivacyLevelFour),
         PrivacyLevel::try_from(4)
     );
-    assert_eq!(Err(prost::UnknownEnumValue(5)), PrivacyLevel::try_from(5));
+    assert_eq!(Err(defiant::UnknownEnumValue(5)), PrivacyLevel::try_from(5));
 
     assert_eq!(
         Ok(ERemoteClientBroadcastMsg::KERemoteClientBroadcastMsgDiscovery),

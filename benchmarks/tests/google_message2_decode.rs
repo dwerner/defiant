@@ -1,6 +1,6 @@
 //! Test to reproduce GoogleMessage2 decode error
 
-use defiant::{Arena, Message};
+use defiant::{Arena, Encode};
 
 pub mod benchmarks {
     include!(concat!(env!("OUT_DIR"), "/benchmarks.rs"));
@@ -25,7 +25,7 @@ fn test_google_message2_decode() {
 
     // First, decode the dataset container
     let dataset =
-        BenchmarkDataset::decode(dataset_bytes, &arena).expect("Failed to decode BenchmarkDataset");
+        BenchmarkDataset::from_buf(dataset_bytes, &arena).expect("Failed to decode BenchmarkDataset");
 
     println!("Dataset contains {} messages", dataset.payload.len());
 
@@ -34,7 +34,7 @@ fn test_google_message2_decode() {
         println!("Decoding message {}, size: {} bytes", idx, buf.len());
 
         let decode_arena = Arena::new();
-        match GoogleMessage2::decode(*buf, &decode_arena) {
+        match GoogleMessage2::from_buf(*buf, &decode_arena) {
             Ok(msg) => {
                 println!("  Successfully decoded message {}", idx);
                 println!("  Message has {} bytes encoded length", msg.encoded_len());

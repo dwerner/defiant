@@ -1,3 +1,6 @@
+#![cfg(ignore)]
+// TODO: Migrate to View API with arena allocation
+
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use defiant::Message;

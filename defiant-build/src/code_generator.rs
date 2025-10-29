@@ -6,8 +6,8 @@ use std::iter;
 use defiant_types::field_descriptor_proto::{Label, Type};
 use defiant_types::source_code_info::Location;
 use defiant_types::{
-    DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto, EnumValueOptions,
-    FieldDescriptorProto, FieldOptions, FileDescriptorProto, OneofDescriptorProto,
+    DescriptorProto, EnumDescriptorProto, EnumValueDescriptorProto,
+    FieldDescriptorProto, FileDescriptorProto, OneofDescriptorProto,
     ServiceDescriptorProto, SourceCodeInfo,
 };
 use itertools::{Either, Itertools};
@@ -249,7 +249,7 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
         self.append_message_attributes(&fq_message_name);
         self.push_indent();
         self.buf.push_str(&format!(
-            "#[derive(Clone, {}PartialEq, {}{}::Message)]\n",
+            "#[derive(Clone, {}PartialEq, {}{}::View)]\n",
             if self.context.can_message_derive_copy(&fq_message_name) {
                 "Copy, "
             } else {
@@ -1168,11 +1168,19 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
             ident_path.next();
         }
 
-        local_path
+        let result = local_path
             .map(|_| "super".to_string())
             .chain(ident_path.map(to_snake))
             .chain(iter::once(to_upper_camel(ident_type)))
-            .join("::")
+            .join("::");
+
+        // If the resolved name conflicts with Rust std types, prefix with self:: to disambiguate
+        // This handles protobuf types named "Option", "Result", etc.
+        if !result.contains("::") && matches!(result.as_str(), "Option" | "Result") {
+            format!("self::{}", result)
+        } else {
+            result
+        }
     }
 
     fn field_type_tag(&self, field: &FieldDescriptorProto) -> Cow<'static, str> {

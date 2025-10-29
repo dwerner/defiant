@@ -1,9 +1,10 @@
 //! Test for arena-allocated repeated fields
 
-use defiant::{Arena, Encode, Message};
+use defiant_derive::View;
+use defiant::{Arena, Encode};
 
 /// PersonList with repeated fields
-#[derive(Message)]
+#[derive(View)]
 struct PersonList<'arena> {
     #[defiant(string, repeated, tag = 1)]
     names: &'arena [&'arena str],

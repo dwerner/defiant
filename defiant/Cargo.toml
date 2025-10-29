@@ -32,22 +32,3 @@ proptest = "1"
 rand = "0.9"
 dhat = "0.3"
 
-[[bench]]
-name = "varint"
-harness = false
-
-[[bench]]
-name = "arena_benchmark"
-harness = false
-
-[[bench]]
-name = "message_sizes"
-harness = false
-
-[[bench]]
-name = "message_sizes_alloc"
-harness = false
-
-[[bench]]
-name = "message_sizes_alloc_simple"
-harness = false

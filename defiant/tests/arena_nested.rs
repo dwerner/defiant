@@ -2,10 +2,12 @@
 //!
 //! This test demonstrates nested protobuf messages with arena allocation.
 
-use defiant::{Arena, Encode, Message};
+use defiant_derive::View;
+use defiant::{Arena, Encode};
 
 /// Address message with arena-allocated string fields
-#[derive(Clone, PartialEq, Message)]
+#[derive(Clone, PartialEq, Debug, View)]
+#[defiant(skip_debug)]
 struct Address<'arena> {
     #[defiant(string, tag = 1)]
     street: &'arena str,
@@ -16,7 +18,7 @@ struct Address<'arena> {
 }
 
 /// Person message with nested Address
-#[derive(Message)]
+#[derive(View)]
 struct Person<'arena> {
     #[defiant(string, tag = 1)]
     name: &'arena str,
@@ -25,7 +27,7 @@ struct Person<'arena> {
 }
 
 /// Company with repeated nested messages
-#[derive(Message)]
+#[derive(View)]
 struct Company<'arena> {
     #[defiant(string, tag = 1)]
     name: &'arena str,

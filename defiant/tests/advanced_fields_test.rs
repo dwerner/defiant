@@ -1,24 +1,24 @@
 //! Test advanced field types with arena allocation
 
-use defiant::Arena;
-use defiant_derive::Message;
+use defiant::{Arena, Encode};
+use defiant_derive::View;
 
-#[derive(Message)]
+#[derive(View)]
 struct Data<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(bytes, tag = "2")]
+    #[defiant(bytes, tag = "2")]
     payload: &'arena [u8],
 
-    #[prost(bytes, repeated, tag = "3")]
+    #[defiant(bytes, repeated, tag = "3")]
     chunks: &'arena [&'arena [u8]],
 }
 
 #[test]
 fn test_bytes_field() {
     let arena = Arena::new();
-    let mut msg = DataMessage::new_in(&arena);
+    let mut msg = DataBuilder::new_in(&arena);
 
     msg.set_name("test");
     msg.set_payload(&[1, 2, 3, 4]);
@@ -30,7 +30,7 @@ fn test_bytes_field() {
 #[test]
 fn test_repeated_bytes() {
     let arena = Arena::new();
-    let mut msg = DataMessage::new_in(&arena);
+    let mut msg = DataBuilder::new_in(&arena);
 
     msg.set_name("test");
     msg.push_chunks(&[1, 2]);
@@ -42,7 +42,7 @@ fn test_repeated_bytes() {
 #[test]
 fn test_bytes_encode_decode() {
     let arena1 = Arena::new();
-    let mut msg = DataMessage::new_in(&arena1);
+    let mut msg = DataBuilder::new_in(&arena1);
 
     msg.set_name("data");
     msg.set_payload(&[0xDE, 0xAD, 0xBE, 0xEF]);
@@ -57,7 +57,7 @@ fn test_bytes_encode_decode() {
 
     // Decode
     let arena2 = Arena::new();
-    let decoded = DataMessage::decode(&buf[..], &arena2).unwrap();
+    let decoded = DataBuilder::decode(&buf[..], &arena2).unwrap();
 
     assert_eq!(decoded.name, "data");
     assert_eq!(decoded.payload, &[0xDE, 0xAD, 0xBE, 0xEF]);

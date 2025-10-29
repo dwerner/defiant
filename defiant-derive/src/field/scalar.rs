@@ -123,10 +123,34 @@ impl Field {
 
         match self.kind {
             Kind::Plain(ref default) => {
-                // For strings, use .is_empty() instead of comparing with ""
+                // Check if value differs from default
+                // For strings/bytes with empty defaults, use .is_empty() for efficiency
+                // For strings/bytes with custom defaults, must compare against the default value
                 let condition = match self.ty {
-                    Ty::String => quote!(!#ident.is_empty()),
-                    Ty::Bytes(_) => quote!(!#ident.is_empty()),
+                    Ty::String => {
+                        if let DefaultValue::String(ref s) = default {
+                            if s.is_empty() {
+                                quote!(!#ident.is_empty())
+                            } else {
+                                let default_val = default.typed();
+                                quote!(#ident != #default_val)
+                            }
+                        } else {
+                            quote!(!#ident.is_empty())
+                        }
+                    }
+                    Ty::Bytes(_) => {
+                        if let DefaultValue::Bytes(ref b) = default {
+                            if b.is_empty() {
+                                quote!(!#ident.is_empty())
+                            } else {
+                                let default_val = default.typed();
+                                quote!(#ident != #default_val)
+                            }
+                        } else {
+                            quote!(!#ident.is_empty())
+                        }
+                    }
                     _ => {
                         let default = default.typed();
                         quote!(#ident != #default)
@@ -245,10 +269,34 @@ impl Field {
 
         match self.kind {
             Kind::Plain(ref default) => {
-                // For strings, use .is_empty() instead of comparing with ""
+                // Check if value differs from default
+                // For strings/bytes with empty defaults, use .is_empty() for efficiency
+                // For strings/bytes with custom defaults, must compare against the default value
                 let condition = match self.ty {
-                    Ty::String => quote!(!#ident.is_empty()),
-                    Ty::Bytes(_) => quote!(!#ident.is_empty()),
+                    Ty::String => {
+                        if let DefaultValue::String(ref s) = default {
+                            if s.is_empty() {
+                                quote!(!#ident.is_empty())
+                            } else {
+                                let default_val = default.typed();
+                                quote!(#ident != #default_val)
+                            }
+                        } else {
+                            quote!(!#ident.is_empty())
+                        }
+                    }
+                    Ty::Bytes(_) => {
+                        if let DefaultValue::Bytes(ref b) = default {
+                            if b.is_empty() {
+                                quote!(!#ident.is_empty())
+                            } else {
+                                let default_val = default.typed();
+                                quote!(#ident != #default_val)
+                            }
+                        } else {
+                            quote!(!#ident.is_empty())
+                        }
+                    }
                     _ => {
                         let default = default.typed();
                         quote!(#ident != #default)

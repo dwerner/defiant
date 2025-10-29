@@ -30,6 +30,7 @@ impl MapType {
     }
 
     /// The fully-qualified Rust type corresponding to the map type.
+    #[allow(dead_code)]
     pub fn rust_type(&self) -> &'static str {
         match self {
             MapType::HashMap => "::std::collections::HashMap",

@@ -1,14 +1,15 @@
 //! Test optional message field handling
 
+use defiant_derive::View;
 use defiant::{Arena, Encode};
 
-#[derive(defiant_derive::Message)]
+#[derive(defiant_derive::View)]
 struct Inner<'arena> {
     #[defiant(string, tag = "1")]
     value: &'arena str,
 }
 
-#[derive(defiant_derive::Message)]
+#[derive(defiant_derive::View)]
 struct Outer<'arena> {
     #[defiant(message, optional, tag = "1")]
     inner: ::core::option::Option<&'arena Inner<'arena>>,

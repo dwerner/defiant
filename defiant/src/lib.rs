@@ -30,6 +30,21 @@ pub use crate::error::{DecodeError, EncodeError, UnknownEnumValue};
 pub use crate::message::{Decode, Encode, MessageView};
 pub use crate::name::Name;
 
+/// Trait for types that can create a builder with default values in an arena.
+///
+/// This trait is automatically implemented by the `View` derive macro for types
+/// that have default values specified on their fields.
+///
+/// # Example
+/// ```ignore
+/// let arena = Arena::new();
+/// let msg = MyMessage::arena_default(&arena).freeze();
+/// ```
+pub trait ArenaDefault<'arena> {
+    type Builder;
+    fn arena_default(arena: &'arena Arena) -> Self::Builder;
+}
+
 // See `encoding::DecodeContext` for more info.
 // 100 is the default recursion limit in the C++ implementation.
 #[cfg(not(feature = "no-recursion-limit"))]

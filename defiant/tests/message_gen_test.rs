@@ -1,22 +1,22 @@
 //! Test to see what the derive macro generates
 
-use defiant_derive::Message;
+use defiant_derive::View;
 
-#[derive(Message)]
+#[derive(View)]
 struct SimplePerson<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(int32, tag = "2")]
+    #[defiant(int32, tag = "2")]
     age: i32,
 }
 
-#[derive(Message)]
+#[derive(View)]
 struct PersonWithRepeated<'arena> {
-    #[prost(string, tag = "1")]
+    #[defiant(string, tag = "1")]
     name: &'arena str,
 
-    #[prost(string, repeated, tag = "2")]
+    #[defiant(string, repeated, tag = "2")]
     tags: &'arena [&'arena str],
 }
 

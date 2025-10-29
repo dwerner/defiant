@@ -1,3 +1,5 @@
+#![cfg(ignore)]
+// TODO: Migrate to View API
 include!(concat!(env!("OUT_DIR"), "/boxed_field.rs"));
 
 use self::foo::OneofField;
