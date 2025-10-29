@@ -157,6 +157,10 @@ pub struct Method<'arena> {
     pub input_proto_type: String,
     /// The output Protobuf type.
     pub output_proto_type: String,
+    /// Whether the input type requires an arena lifetime parameter.
+    pub input_has_arena: bool,
+    /// Whether the output type requires an arena lifetime parameter.
+    pub output_has_arena: bool,
     /// The method options.
     pub options: defiant_types::MethodOptions<'arena>,
     /// Identifies if client streams multiple client messages.
