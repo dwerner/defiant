@@ -972,6 +972,10 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                 let client_streaming = method.client_streaming();
                 let server_streaming = method.server_streaming();
 
+                // Check if input/output types need arena lifetime
+                let input_has_arena = self.messages_with_lifetime.contains(input_proto_type);
+                let output_has_arena = self.messages_with_lifetime.contains(output_proto_type);
+
                 Method {
                     name: to_snake(&name),
                     proto_name: name.to_string(),
@@ -980,6 +984,8 @@ impl<'buf, 'ctx, 'arena> CodeGenerator<'buf, 'ctx, 'arena> {
                     output_type,
                     input_proto_type: input_proto_type.to_string(),
                     output_proto_type: output_proto_type.to_string(),
+                    input_has_arena,
+                    output_has_arena,
                     options: method
                         .options
                         .cloned()
